@@ -1,0 +1,24 @@
+%% vim:ft=erlang:sw=2:et:
+{application, khepri_mnesia_migration,
+ [{description, "Tools to migrate between Mnesia and Khepri"},
+  {vsn, "0.1.0"},
+  {registered, [khepri_mnesia_migration_sup,
+                m2k_cluster_sync_sup]},
+  {mod, {khepri_mnesia_migration_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    mnesia,
+    khepri
+   ]},
+  {env,[]},
+  {files, [
+    "README.md", "LICENSE-Apache-2.0", "LICENSE-MPL-2.0", "mix.exs",
+    "rebar.config", "rebar.lock", "src"]},
+  {modules, []},
+
+  {licenses, ["Apache-2.0", "MPL-2.0"]},
+  {links, [{"GitHub", "https://github.com/rabbitmq/khepri_mnesia_migration"}]},
+  {build_tools, ["rebar3", "mix"]},
+  {doc, "doc"}
+ ]}.
