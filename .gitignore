@@ -17,3 +17,11 @@ _build
 *.iml
 rebar3.crashdump
 *~
+/_checkouts
+/doc/*
+!/doc/_head.html
+!/doc/khepri-favicon.svg
+!/doc/khepri-logo.svg
+!/doc/overview.edoc
+!/doc/stylesheet.css
+/mix.lock
