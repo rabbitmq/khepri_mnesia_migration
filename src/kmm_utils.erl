@@ -25,7 +25,7 @@ mnesia_nodes() ->
                          running_nodes => RunningNodes})
             end;
         false ->
-            ?kmm_misuse(mnesia_must_run, #{})
+            ?kmm_misuse(mnesia_must_run, #{node => node()})
     end.
 
 is_khepri_store_running(StoreId) ->

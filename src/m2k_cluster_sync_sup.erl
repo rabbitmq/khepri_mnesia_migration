@@ -17,6 +17,7 @@ prepare_cluster_sync_worker(StoreId) ->
 
 init([]) ->
     M2KClusterSync = #{id => m2k_cluster_sync,
+                       restart => temporary,
                        start => {m2k_cluster_sync, start_link, []}},
 
     SupFlags = #{strategy => simple_one_for_one,

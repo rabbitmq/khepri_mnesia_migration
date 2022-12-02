@@ -2,6 +2,10 @@
 
 -behaviour(gen_server).
 
+-include_lib("kernel/include/logger.hrl").
+
+-include("src/kmm_error.hrl").
+
 -export([start_link/1,
          proceed/1]).
 -export([init/1,
@@ -9,10 +13,6 @@
          handle_cast/2,
          handle_info/2,
          terminate/2]).
-
--include_lib("kernel/include/logger.hrl").
-
--include("src/kmm_error.hrl").
 
 -record(?MODULE, {khepri_store}).
 
@@ -42,7 +42,7 @@ handle_call(proceed, _From, State) ->
           catch
               throw:?kmm_error(_, _) = Reason ->
                   {error, Reason};
-              exit:?kmm_exception(_, _) = Exception ->
+              error:?kmm_exception(_, _) = Exception ->
                   {exception, Exception}
           end,
     {reply, Ret, State};

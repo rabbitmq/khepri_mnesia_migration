@@ -11,6 +11,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
+-include("src/kmm_error.hrl").
+
 -export([all/0,
          groups/0,
          init_per_suite/1,
@@ -24,12 +26,16 @@
 
          can_create_khepri_cluster_from_mnesia_cluster/1,
          no_data_loss_in_the_largest_khepri_cluster/1,
-         no_data_loss_in_the_khepri_cluster_having_data/1]).
+         no_data_loss_in_the_khepri_cluster_having_data/1,
+         mnesia_must_run/1,
+         khepri_store_must_run/1]).
 
 all() ->
     [can_create_khepri_cluster_from_mnesia_cluster,
      no_data_loss_in_the_largest_khepri_cluster,
-     no_data_loss_in_the_khepri_cluster_having_data].
+     no_data_loss_in_the_khepri_cluster_having_data,
+     mnesia_must_run,
+     khepri_store_must_run].
 
 groups() ->
     [].
@@ -248,6 +254,74 @@ no_data_loss_in_the_khepri_cluster_having_data(Config) ->
        {ok, #{[bar] => value_to_keep,
               [baz] => value_to_keep}},
        rpc:call(Node4, khepri, get_many, [StoreId, "/*"])),
+
+    ok.
+
+mnesia_must_run(Config) ->
+    PropsPerNode = ?config(ra_system_props, Config),
+    [Node1, Node2, Node3, _, _] = Nodes = lists:sort(maps:keys(PropsPerNode)),
+
+    %% We assume all nodes are using the same Ra system name & store ID.
+    #{ra_system := RaSystem} = maps:get(Node1, PropsPerNode),
+    StoreId = RaSystem,
+
+    helpers:cluster_mnesia_nodes(Nodes),
+
+    ?assertEqual(
+       stopped,
+       rpc:call(Node2, mnesia, stop, [])),
+    RunningNodes = Nodes -- [Node2],
+
+    ?assertMatch(
+       {badrpc,
+        {'EXIT',
+         {?kmm_exception(
+             mnesia_must_run,
+             #{node := Node2}), _}}},
+       rpc:call(Node2, mnesia_to_khepri, sync_cluster, [StoreId])),
+
+    ?assertMatch(
+       {badrpc,
+        {'EXIT',
+         {?kmm_exception(
+             all_mnesia_nodes_must_run,
+             #{all_nodes := Nodes,
+               running_nodes := RunningNodes}), _}}},
+       rpc:call(Node3, mnesia_to_khepri, sync_cluster, [StoreId])),
+
+    ok.
+
+khepri_store_must_run(Config) ->
+    PropsPerNode = ?config(ra_system_props, Config),
+    [Node1, Node2, Node3, _, _] = Nodes = lists:sort(maps:keys(PropsPerNode)),
+
+    %% We assume all nodes are using the same Ra system name & store ID.
+    #{ra_system := RaSystem} = maps:get(Node1, PropsPerNode),
+    StoreId = RaSystem,
+
+    helpers:cluster_mnesia_nodes(Nodes),
+
+    ?assertEqual(
+       {ok, StoreId},
+       rpc:call(Node1, khepri, start, [RaSystem, StoreId])),
+
+    ?assertMatch(
+       {badrpc,
+        {'EXIT',
+         {?kmm_exception(
+             khepri_store_must_run,
+             #{node := Node2,
+               store_id := StoreId}), _}}},
+       rpc:call(Node1, mnesia_to_khepri, sync_cluster, [StoreId])),
+
+    ?assertMatch(
+       {badrpc,
+        {'EXIT',
+         {?kmm_exception(
+             khepri_store_must_run,
+             #{node := Node2,
+               store_id := StoreId}), _}}},
+       rpc:call(Node3, mnesia_to_khepri, sync_cluster, [StoreId])),
 
     ok.
 
