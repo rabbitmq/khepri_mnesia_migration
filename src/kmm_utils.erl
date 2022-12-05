@@ -35,7 +35,7 @@ khepri_nodes(StoreId) ->
     case is_khepri_store_running(StoreId) of
         true ->
             AllNodes = lists:sort(khepri_cluster:nodes(StoreId)),
-            %% FIXME: Ensure all nodes are running.
+            %% TODO: Ensure all nodes are running?
             AllNodes;
         false ->
             ?kmm_misuse(

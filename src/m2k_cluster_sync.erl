@@ -5,6 +5,7 @@
 -include_lib("kernel/include/logger.hrl").
 
 -include("src/kmm_error.hrl").
+-include("src/kmm_logging.hrl").
 
 -export([start_link/1,
          proceed/1]).
@@ -41,8 +42,16 @@ handle_call(proceed, _From, State) ->
               do_sync_cluster(State)
           catch
               throw:?kmm_error(_, _) = Reason ->
+                  ?LOG_ERROR(
+                     "Failed to synchronize Mnesia->Khepri clusters: ~0p",
+                     [Reason],
+                     #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
                   {error, Reason};
               error:?kmm_exception(_, _) = Exception ->
+                  ?LOG_ERROR(
+                     "Exception during Mnesia->Khepri clusters sync: ~0p",
+                     [Exception],
+                     #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
                   {exception, Exception}
           end,
     {reply, Ret, State};
@@ -70,15 +79,39 @@ terminate(_Reason, _State) ->
 %% -------------------------------------------------------------------
 
 do_sync_cluster(#?MODULE{khepri_store = StoreId}) ->
+    ?LOG_INFO(
+       "Syncing Mnesia->Khepri clusters membership",
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+
     MnesiaNodes = kmm_utils:mnesia_nodes(),
+    ?LOG_DEBUG(
+       "Mnesia->Khepri cluster sync: Mnesia cluster: ~0p",
+       [MnesiaNodes],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+
     LargestKhepriCluster = find_largest_khepri_cluster(MnesiaNodes, StoreId),
+    ?LOG_DEBUG(
+       "Mnesia->Khepri cluster sync: Largest Khepri cluster: ~0p",
+       [LargestKhepriCluster],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+
     NodesToAdd = MnesiaNodes -- LargestKhepriCluster,
+    ?LOG_DEBUG(
+       "Mnesia->Khepri cluster sync: Khepri nodes joining the largest "
+       "Khepri cluster: ~0p",
+       [NodesToAdd],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+
     add_nodes_to_khepri_cluster(NodesToAdd, LargestKhepriCluster, StoreId).
 
 find_largest_khepri_cluster(Nodes, StoreId) ->
     KhepriClusters = list_all_khepri_clusters(Nodes, StoreId),
     KhepriClustersBySize = sort_khepri_clusters_by_size(
                              KhepriClusters, StoreId),
+    ?LOG_DEBUG(
+       "Mnesia->Khepri cluster sync: Khepri clusters: ~0p",
+       [KhepriClustersBySize],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
     LargestKhepriCluster = hd(KhepriClustersBySize),
     LargestKhepriCluster.
 
@@ -88,7 +121,7 @@ list_all_khepri_clusters(Nodes, StoreId) ->
                                Cluster = khepri_cluster_on_node(Node, StoreId),
                                Acc#{Cluster => true}
                        end, #{}, Nodes),
-    lists:sort(maps:keys(KhepriClusters)).
+    maps:keys(KhepriClusters).
 
 khepri_cluster_on_node(Node, StoreId) ->
     case rpc:call(Node, khepri_cluster, nodes, [StoreId]) of
@@ -126,7 +159,12 @@ do_sort_khepri_clusters_by_size(KhepriCluster, StoreId) ->
                   ALength =:= BLength ->
                       ATreeNodesCount = get_tree_nodes_count(A, StoreId),
                       BTreeNodesCount = get_tree_nodes_count(B, StoreId),
-                      ATreeNodesCount >= BTreeNodesCount;
+                      if
+                          ATreeNodesCount =:= BTreeNodesCount ->
+                              A =< B;
+                          true ->
+                              ATreeNodesCount > BTreeNodesCount
+                      end;
                   true ->
                       length(A) > length(B)
               end
