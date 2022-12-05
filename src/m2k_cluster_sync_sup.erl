@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 -export([start_link/0,
-         prepare_cluster_sync_worker/1]).
+         prepare_worker/1]).
 
 -export([init/1]).
 
@@ -12,7 +12,7 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-prepare_cluster_sync_worker(StoreId) ->
+prepare_worker(StoreId) ->
     supervisor:start_child(?SERVER, [#{khepri_store => StoreId}]).
 
 init([]) ->

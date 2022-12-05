@@ -58,17 +58,22 @@ handle_call(proceed, _From, State) ->
 handle_call(Request, _From, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_call message: ~p",
-       [Request]),
+       [Request],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
     {reply, undefined, State}.
 
 handle_cast(Request, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_cast message: ~p",
-       [Request]),
+       [Request],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
     {noreply, State}.
 
 handle_info(Msg, State) ->
-    ?LOG_WARNING(?MODULE_STRING ": Unhandled handle_info message: ~p", [Msg]),
+    ?LOG_WARNING(
+       ?MODULE_STRING ": Unhandled handle_info message: ~p",
+       [Msg],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

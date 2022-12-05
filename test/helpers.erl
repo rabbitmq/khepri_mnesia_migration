@@ -7,7 +7,9 @@
 
 -module(helpers).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
+-include_lib("common_test/include/ct.hrl").
 
 -export([init_list_of_modules_to_skip/0,
          start_ra_system/1,
@@ -17,6 +19,9 @@
          cluster_mnesia_nodes/1,
          mnesia_cluster_members/1,
          khepri_cluster_members/2,
+         setup_node/1,
+         basic_logger_config/0,
+         start_n_nodes/3,
          with_log/1,
          capture_log/1,
          silence_default_logger/0,
@@ -117,6 +122,112 @@ mnesia_cluster_members(Node) ->
 khepri_cluster_members(Node, StoreId) ->
     Nodes = rpc:call(Node, khepri_cluster, nodes, [StoreId]),
     lists:sort(Nodes).
+
+-define(LOGFMT_CONFIG, #{legacy_header => false,
+                         single_line => false,
+                         template => [time, " ", pid, ": ", msg, "\n"]}).
+
+setup_node(PrivDir) ->
+    basic_logger_config(),
+
+    %% We use an additional logger handler for messages tagged with a non-OTP
+    %% domain because by default, `cth_log_redirect' drops them.
+    GL = erlang:group_leader(),
+    GLNode = node(GL),
+    Ret = logger:add_handler(
+            cth_log_redirect_any_domains, cth_log_redirect_any_domains,
+            #{config => #{group_leader => GL,
+                          group_leader_node => GLNode}}),
+    case Ret of
+        ok                          -> ok;
+        {error, {already_exist, _}} -> ok
+    end,
+    ok = logger:set_handler_config(
+           cth_log_redirect_any_domains, formatter,
+           {logger_formatter, ?LOGFMT_CONFIG}),
+    ?LOG_INFO(
+       "Extended logger configuration (~s):~n~p",
+       [node(), logger:get_config()]),
+
+    Node = node(),
+    MnesiaBasename = lists:flatten(
+                       io_lib:format("_test.mnesia.~s", [Node])),
+    MnesiaDir = filename:join(PrivDir, MnesiaBasename),
+    ok = application:set_env(
+           mnesia, dir, MnesiaDir, [{persistent, true}]),
+    ok = mnesia:create_schema([Node]),
+
+    ok = application:set_env(
+           khepri, default_timeout, 5000, [{persistent, true}]),
+
+    ok.
+
+basic_logger_config() ->
+    _ = logger:set_primary_config(level, debug),
+
+    HandlerIds = [HandlerId ||
+                  HandlerId <- logger:get_handler_ids(),
+                  HandlerId =:= default orelse
+                  HandlerId =:= cth_log_redirect],
+    lists:foreach(
+      fun(HandlerId) ->
+              ok = logger:set_handler_config(
+                    HandlerId, formatter,
+                    {logger_formatter, ?LOGFMT_CONFIG}),
+              _ = logger:add_handler_filter(
+                    HandlerId, progress,
+                    {fun logger_filters:progress/2,stop}),
+              _ = logger:remove_handler_filter(
+                    HandlerId, remote_gl)
+      end, HandlerIds),
+    ?LOG_INFO(
+       "Basic logger configuration (~s):~n~p",
+       [node(), logger:get_config()]),
+
+    ok.
+
+start_n_nodes(Config, NamePrefix, Count) ->
+    ct:pal("Start ~b Erlang nodes:", [Count]),
+    Nodes = [begin
+                 Name = lists:flatten(
+                          io_lib:format(
+                            "~s-~s-~b", [?MODULE, NamePrefix, I])),
+                 ct:pal("- ~s", [Name]),
+                 start_erlang_node(Name)
+             end || I <- lists:seq(1, Count)],
+    ct:pal("Started nodes: ~p", [[Node || {Node, _Peer} <- Nodes]]),
+
+    %% We add all nodes to the test coverage report.
+    CoveredNodes = [Node || {Node, _Peer} <- Nodes],
+    {ok, _} = cover:start([node() | CoveredNodes]),
+
+    CodePath = code:get_path(),
+    PrivDir = ?config(priv_dir, Config),
+    lists:foreach(
+      fun({Node, _Peer}) ->
+              rpc:call(Node, code, add_pathsz, [CodePath]),
+              ok = rpc:call(Node, ?MODULE, setup_node, [PrivDir])
+      end, Nodes),
+    Nodes.
+
+-if(?OTP_RELEASE >= 25).
+start_erlang_node(Name) ->
+    Name1 = list_to_atom(Name),
+    {ok, Peer, Node} = peer:start(#{name => Name1,
+                                    wait_boot => infinity}),
+    {Node, Peer}.
+%stop_erlang_node(_Node, Peer) ->
+%    ok = peer:stop(Peer).
+-else.
+start_erlang_node(Name) ->
+    Name1 = list_to_atom(Name),
+    Options = [{monitor_master, true}],
+    {ok, Node} = ct_slave:start(Name1, Options),
+    {Node, Node}.
+%stop_erlang_node(_Node, Node) ->
+%    {ok, _} = ct_slave:stop(Node),
+%    ok.
+-endif.
 
 silence_default_logger() ->
     {ok, #{level := OldDefaultLoggerLevel}} =
