@@ -11,6 +11,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("common_test/include/ct.hrl").
 
+-include_lib("khepri/include/khepri.hrl").
+
 -include("src/kmm_error.hrl").
 
 -export([all/0,
@@ -23,6 +25,8 @@
          end_per_testcase/2,
 
          can_copy_existing_data_from_mnesia_to_khepri/1]).
+
+-record(my_record, {key, value}).
 
 all() ->
     [can_copy_existing_data_from_mnesia_to_khepri].
@@ -92,7 +96,36 @@ can_copy_existing_data_from_mnesia_to_khepri(Config) ->
          SomeNode, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
 
     ?assertEqual(
+       {atomic, ok},
+       rpc:call(
+         SomeNode, mnesia, create_table,
+         [my_record, [{attributes, record_info(fields, my_record)},
+                      {disc_copies, Nodes}]])),
+
+    ?assertEqual(
+       {atomic, ok},
+       rpc:call(
+         SomeNode, mnesia, transaction,
+         [fun() ->
+                  mnesia:write(#my_record{key = foo, value = foo_value})
+          end])),
+
+    ?assertEqual(
        ok,
-       rpc:call(SomeNode, mnesia_to_khepri, copy_data, [StoreId])),
+       rpc:call(
+         SomeNode, mnesia_to_khepri, copy_data,
+         [StoreId, mnesia_to_khepri_default_converter])),
+
+    MnesiaObjects = rpc:call(
+                      SomeNode,
+                      mnesia, dirty_match_object, [#my_record{_ = '_'}]),
+    {ok, KhepriObjects} = rpc:call(
+                            SomeNode,
+                            khepri, get_many,
+                            [StoreId, [my_record, ?KHEPRI_WILDCARD_STAR]]),
+
+    ?assertEqual(
+       lists:sort(MnesiaObjects),
+       lists:sort(maps:values(KhepriObjects))),
 
     ok.

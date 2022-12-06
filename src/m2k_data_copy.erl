@@ -15,9 +15,9 @@
          handle_info/2,
          terminate/2]).
 
--record(?MODULE, {khepri_store,
+-record(?MODULE, {tables,
+                  khepri_store,
                   callback_mod,
-                  tables,
                   subscriber}).
 
 proceed(SupPid) ->
@@ -42,14 +42,20 @@ start_link(Args) ->
 init(#{khepri_store := StoreId,
        callback_mod := Mod} = Args) ->
     erlang:process_flag(trap_exit, true),
-    Tables = case Args of
-                 #{tables := T} -> T;
-                 _              -> lists:sort(mnesia:system_info(tables))
-             end,
-    State = #?MODULE{khepri_store = StoreId,
-                     callback_mod = Mod,
-                     tables = Tables},
-    {ok, State}.
+    Tables0 = case Args of
+                  #{tables := T} -> T;
+                  _              -> lists:sort(mnesia:system_info(tables))
+              end,
+    Tables1 = Tables0 -- [schema],
+    case Tables1 of
+        [] ->
+            ignore;
+        _ ->
+            State = #?MODULE{khepri_store = StoreId,
+                             callback_mod = Mod,
+                             tables = Tables1},
+            {ok, State}
+    end.
 
 handle_call({proceed, SubscriberPid}, _From, State) ->
     State1 = State#?MODULE{subscriber = SubscriberPid},
@@ -114,22 +120,22 @@ do_copy_data(#?MODULE{tables = Tables} = State) ->
     ok = subscribe_to_mnesia_changes(State),
 
     ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Actually copy data",
+       "Mnesia->Khepri data copy: Start actual data copy",
        #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = copy_from_mnesia_to_khepri(State),
+    ok = copy_from_mnesia_to_khepri(State).
 
-    %% Mnesia transaction to handle received Mnesia events and tables removal.
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Final sync",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = final_sync_from_mnesia_to_khepri(State),
-
-    %% Unsubscribe to Mnesia events. All Mnesia tables are synchronized and
-    %% read-only at this point.
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Unsubscribe to Mnesia changes",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = unsubscribe_to_mnesia_changes(State).
+%    %% Mnesia transaction to handle received Mnesia events and tables removal.
+%    ?LOG_DEBUG(
+%       "Mnesia->Khepri data copy: Final sync",
+%       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+%    ok = final_sync_from_mnesia_to_khepri(State),
+%
+%    %% Unsubscribe to Mnesia events. All Mnesia tables are synchronized and
+%    %% read-only at this point.
+%    ?LOG_DEBUG(
+%       "Mnesia->Khepri data copy: Unsubscribe to Mnesia changes",
+%       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+%    ok = unsubscribe_to_mnesia_changes(State).
 
 subscribe_to_mnesia_changes(
   #?MODULE{tables = Tables, subscriber = SubscriberPid}) ->
@@ -144,11 +150,24 @@ subscribe_to_mnesia_changes(
                    error => Error}))
     end.
 
-copy_from_mnesia_to_khepri(#?MODULE{}) ->
-    ok.
+copy_from_mnesia_to_khepri(
+  #?MODULE{khepri_store = StoreId,
+           tables = Tables,
+           callback_mod = Mod} = _State) ->
+    case mnesia:activate_checkpoint([{min, Tables}]) of
+        {ok, Checkpoint, _Nodes} ->
+            Args = #{callback_mod => Mod,
+                     tables => Tables,
+                     khepri_store => StoreId},
+            Ret = mnesia:backup_checkpoint(Checkpoint, Args, m2k_export),
+            _ = mnesia:deactivate_checkpoint(Checkpoint),
+            Ret;
+        Error ->
+            Error
+    end.
 
-final_sync_from_mnesia_to_khepri(#?MODULE{}) ->
-    ok.
-
-unsubscribe_to_mnesia_changes(#?MODULE{subscriber = SubscriberPid}) ->
-    m2k_subscriber:unsubscribe(SubscriberPid).
+%final_sync_from_mnesia_to_khepri(#?MODULE{}) ->
+%    ok.
+%
+%unsubscribe_to_mnesia_changes(#?MODULE{subscriber = SubscriberPid}) ->
+%    m2k_subscriber:unsubscribe(SubscriberPid).

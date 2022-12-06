@@ -24,6 +24,6 @@ init([Args]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1,
-                 auto_shutdown => all_significant},
+                 auto_shutdown => any_significant},
     ChildSpecs = [M2KSubscriber, M2KDataCopy],
     {ok, {SupFlags, ChildSpecs}}.
