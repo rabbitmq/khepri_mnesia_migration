@@ -75,7 +75,7 @@ handle_call({proceed, SubscriberPid}, _From, State) ->
                      #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
                   {exception, Exception}
           end,
-    {reply, Ret, State1};
+    {stop, normal, Ret, State1};
 handle_call(Request, _From, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_call message: ~p",
@@ -122,20 +122,14 @@ do_copy_data(#?MODULE{tables = Tables} = State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Start actual data copy",
        #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = copy_from_mnesia_to_khepri(State).
+    ok = copy_from_mnesia_to_khepri(State),
 
-%    %% Mnesia transaction to handle received Mnesia events and tables removal.
-%    ?LOG_DEBUG(
-%       "Mnesia->Khepri data copy: Final sync",
-%       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-%    ok = final_sync_from_mnesia_to_khepri(State),
-%
-%    %% Unsubscribe to Mnesia events. All Mnesia tables are synchronized and
-%    %% read-only at this point.
-%    ?LOG_DEBUG(
-%       "Mnesia->Khepri data copy: Unsubscribe to Mnesia changes",
-%       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-%    ok = unsubscribe_to_mnesia_changes(State).
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: Final sync",
+       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+    ok = final_sync_from_mnesia_to_khepri(State),
+
+    ok.
 
 subscribe_to_mnesia_changes(
   #?MODULE{tables = Tables, subscriber = SubscriberPid}) ->
@@ -166,8 +160,5 @@ copy_from_mnesia_to_khepri(
             Error
     end.
 
-%final_sync_from_mnesia_to_khepri(#?MODULE{}) ->
-%    ok.
-%
-%unsubscribe_to_mnesia_changes(#?MODULE{subscriber = SubscriberPid}) ->
-%    m2k_subscriber:unsubscribe(SubscriberPid).
+final_sync_from_mnesia_to_khepri(#?MODULE{subscriber = SubscriberPid}) ->
+    m2k_subscriber:flush(SubscriberPid).

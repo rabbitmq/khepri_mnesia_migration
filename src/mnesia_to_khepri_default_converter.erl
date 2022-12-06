@@ -6,6 +6,7 @@
 
 -export([init_copy_to_khepri/2,
          copy_to_khepri/2,
+         delete_from_khepri/2,
          finish_copy_to_khepri/1]).
 
 -record(?MODULE, {table,
@@ -49,6 +50,32 @@ copy_to_khepri(
             {error, {?MODULE, mnesia_key_type_unsupported,
                      #{table => Table,
                        record => Record,
+                       key => Key}}}
+    end.
+
+delete_from_khepri(
+  Key,
+  #?MODULE{table = Table,
+           store_id = StoreId} = State) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: [" ?MODULE_STRING "] key: ~0p",
+       [Key],
+       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+    Supported = is_atom(Key) orelse is_binary(Key),
+    case Supported of
+        true ->
+            Path = [Table, Key],
+            ?LOG_DEBUG(
+               "Mnesia->Khepri data copy: [" ?MODULE_STRING "] path: ~0p",
+               [Path],
+               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+            case khepri:delete(StoreId, Path) of
+                ok    -> {ok, State};
+                Error -> Error
+            end;
+        false ->
+            {error, {?MODULE, mnesia_key_type_unsupported,
+                     #{table => Table,
                        key => Key}}}
     end.
 
