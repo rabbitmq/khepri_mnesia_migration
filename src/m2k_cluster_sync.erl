@@ -18,7 +18,7 @@
 -record(?MODULE, {khepri_store}).
 
 proceed(Pid) ->
-    case gen_server:call(Pid, ?FUNCTION_NAME) of
+    case gen_server:call(Pid, ?FUNCTION_NAME, infinity) of
         {exception, ?kmm_exception(_, _) = Exception} ->
             ?kmm_misuse(Exception);
         Ret ->

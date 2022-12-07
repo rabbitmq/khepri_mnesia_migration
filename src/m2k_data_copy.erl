@@ -25,10 +25,12 @@ proceed(SupPid) ->
      {m2k_subscriber, SubscriberPid, _, _}] =
     lists:sort(supervisor:which_children(SupPid)),
 
-    case gen_server:call(DataCopyPid, {?FUNCTION_NAME, SubscriberPid}) of
+    Ret = gen_server:call(
+            DataCopyPid, {?FUNCTION_NAME, SubscriberPid}, infinity),
+    case Ret of
         {exception, ?kmm_exception(_, _) = Exception} ->
             ?kmm_misuse(Exception);
-        Ret ->
+        _ ->
             Ret
     end.
 

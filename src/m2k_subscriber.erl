@@ -22,10 +22,10 @@
                   events = []}).
 
 subscribe(Pid, Tables) ->
-    gen_server:call(Pid, {?FUNCTION_NAME, Tables}).
+    gen_server:call(Pid, {?FUNCTION_NAME, Tables}, infinity).
 
 flush(Pid) ->
-    gen_server:call(Pid, ?FUNCTION_NAME).
+    gen_server:call(Pid, ?FUNCTION_NAME, infinity).
 
 start_link(Args) ->
     gen_server:start_link(?MODULE, Args, []).
@@ -149,7 +149,7 @@ do_unsubscribe1([Table | Rest]) ->
 do_unsubscribe1([]) ->
     ok.
 
-do_flush(State) ->
+do_flush(#?MODULE{subscribed_to = SubscribedTo} = State) ->
     %% Switch all tables to read-only. All concurrent and future Mnesia
     %% transactions involving a write to one of them will fail with the
     %% `{no_exists, Table}' exception.
@@ -162,7 +162,7 @@ do_flush(State) ->
     %% During the first round of copy, we received all write events as
     %% messages (parallel writes were authorized). Now, we want to consume
     %% those messages to record the writes we probably missed.
-    State2 = consume_mnesia_events(State1),
+    State2 = consume_mnesia_events(SubscribedTo, State1),
     State2.
 
 make_tables_readonly(#?MODULE{subscribed_to = SubscribedTo}) ->
@@ -179,14 +179,14 @@ make_tables_readonly(#?MODULE{subscribed_to = SubscribedTo}) ->
       end, SubscribedTo).
 
 consume_mnesia_events(
+  Tables,
   #?MODULE{khepri_store = StoreId,
            callback_mod = Mod,
-           subscribed_to = SubscribedTo,
            events = Events} = State) ->
     Events1 = lists:reverse(Events),
     ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Consuming ~b Mnesia events",
-       [length(Events1)],
+       "Mnesia->Khepri data copy: Consuming ~b Mnesia events from tables ~0p",
+       [length(Events1), Tables],
        #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
     ModPrivs = lists:foldl(
                  fun(Table, MPs) ->
@@ -194,7 +194,7 @@ consume_mnesia_events(
                              {ok, ModPriv} -> MPs#{Table => ModPriv};
                              Error         -> throw(Error)
                          end
-                 end, #{}, SubscribedTo),
+                 end, #{}, Tables),
     consume_mnesia_events1(Events1, Mod, ModPrivs),
     State#?MODULE{events = []}.
 

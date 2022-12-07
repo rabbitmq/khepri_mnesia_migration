@@ -24,12 +24,14 @@
          init_per_testcase/2,
          end_per_testcase/2,
 
-         can_copy_existing_data_from_mnesia_to_khepri/1]).
+         can_copy_existing_data_from_mnesia_to_khepri/1,
+         can_copy_data_added_concurrently_from_mnesia_to_khepri/1]).
 
 -record(my_record, {key, value}).
 
 all() ->
-    [can_copy_existing_data_from_mnesia_to_khepri].
+    [can_copy_existing_data_from_mnesia_to_khepri,
+     can_copy_data_added_concurrently_from_mnesia_to_khepri].
 
 groups() ->
     [].
@@ -94,20 +96,23 @@ can_copy_existing_data_from_mnesia_to_khepri(Config) ->
        ok,
        rpc:call(
          SomeNode, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
-
     ?assertEqual(
        {atomic, ok},
        rpc:call(
          SomeNode, mnesia, create_table,
          [my_record, [{attributes, record_info(fields, my_record)},
                       {disc_copies, Nodes}]])),
-
     ?assertEqual(
        {atomic, ok},
        rpc:call(
          SomeNode, mnesia, transaction,
          [fun() ->
-                  mnesia:write(#my_record{key = foo, value = foo_value})
+                  lists:foreach(
+                    fun(I) ->
+                            Key = make_key(I),
+                            Value = make_value(I),
+                            mnesia:write(#my_record{key = Key, value = Value})
+                    end, lists:seq(1, 1000))
           end])),
 
     ?assertEqual(
@@ -124,8 +129,117 @@ can_copy_existing_data_from_mnesia_to_khepri(Config) ->
                             khepri, get_many,
                             [StoreId, [my_record, ?KHEPRI_WILDCARD_STAR]]),
 
+    ?assertNotEqual([], MnesiaObjects),
     ?assertEqual(
        lists:sort(MnesiaObjects),
        lists:sort(maps:values(KhepriObjects))),
 
     ok.
+
+can_copy_data_added_concurrently_from_mnesia_to_khepri(Config) ->
+    PropsPerNode = ?config(ra_system_props, Config),
+    Nodes = lists:sort(maps:keys(PropsPerNode)),
+    SomeNode = lists:nth(2, Nodes),
+
+    %% We assume all nodes are using the same Ra system name & store ID.
+    #{ra_system := RaSystem} = maps:get(SomeNode, PropsPerNode),
+    StoreId = RaSystem,
+
+    helpers:cluster_mnesia_nodes(Nodes),
+
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(
+                 {ok, StoreId},
+                 rpc:call(Node, khepri, start, [RaSystem, StoreId]))
+      end, Nodes),
+
+    ?assertEqual(
+       ok,
+       rpc:call(
+         SomeNode, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
+    ?assertEqual(
+       {atomic, ok},
+       rpc:call(
+         SomeNode, mnesia, create_table,
+         [my_record, [{attributes, record_info(fields, my_record)},
+                      {disc_copies, Nodes}]])),
+    ?assertEqual(
+       {atomic, ok},
+       rpc:call(
+         SomeNode, mnesia, transaction,
+         [fun() ->
+                  lists:foreach(
+                    fun(I) ->
+                            Key = make_key(I),
+                            Value = make_value(I),
+                            mnesia:write(#my_record{key = Key, value = Value})
+                    end, lists:seq(1, 1000))
+          end])),
+
+    _Worker =
+    spawn_link(
+      fun() ->
+              lists:foreach(
+                fun(I) ->
+                        Key = make_key(I),
+                        Value = make_value(I),
+                        Ret1 = rpc:call(
+                                 SomeNode, mnesia, transaction,
+                                 [fun() ->
+                                          mnesia:write(
+                                            #my_record{key = Key,
+                                                       value = Value})
+                                  end]),
+                        log_failed_tx(Ret1),
+
+                        if
+                            I rem 5 =:= 0 ->
+                                PreviousKey = make_key(I - 1),
+                                Ret2 = rpc:call(
+                                         SomeNode, mnesia, transaction,
+                                         [fun() ->
+                                                  mnesia:delete(
+                                                    my_record,
+                                                    PreviousKey,
+                                                    write)
+                                          end]),
+                                log_failed_tx(Ret2);
+                            true ->
+                                ok
+                        end
+                end, lists:seq(1, 1000))
+      end),
+    timer:sleep(100),
+
+    ?assertEqual(
+       ok,
+       rpc:call(
+         SomeNode, mnesia_to_khepri, copy_data,
+         [StoreId, mnesia_to_khepri_default_converter])),
+
+    MnesiaObjects = rpc:call(
+                      SomeNode,
+                      mnesia, dirty_match_object, [#my_record{_ = '_'}]),
+    {ok, KhepriObjects} = rpc:call(
+                            SomeNode,
+                            khepri, get_many,
+                            [StoreId, [my_record, ?KHEPRI_WILDCARD_STAR]]),
+
+    ?assertNotEqual([], MnesiaObjects),
+    ?assertEqual(
+       lists:sort(MnesiaObjects),
+       lists:sort(maps:values(KhepriObjects))),
+
+    ok.
+
+make_key(I) ->
+    list_to_binary(io_lib:format("key_~b", [I])).
+
+make_value(I) ->
+    io_lib:format("value_~b", [I]).
+
+log_failed_tx({atomic, _}) ->
+    ok;
+log_failed_tx({aborted, _} = Aborted) ->
+    ct:pal("Failed tx: ~0p", [Aborted]).
