@@ -9,23 +9,22 @@
 
 -export([start_link/1,
          subscribe/2,
-         flush/1]).
+         flush/2]).
 -export([init/1,
          handle_call/3,
          handle_cast/2,
          handle_info/2,
          terminate/2]).
 
--record(?MODULE, {khepri_store,
-                  callback_mod,
+-record(?MODULE, {callback_mod,
                   subscribed_to = [],
                   events = []}).
 
 subscribe(Pid, Tables) ->
     gen_server:call(Pid, {?FUNCTION_NAME, Tables}, infinity).
 
-flush(Pid) ->
-    gen_server:call(Pid, ?FUNCTION_NAME, infinity).
+flush(Pid, ModPriv) ->
+    gen_server:call(Pid, {?FUNCTION_NAME, ModPriv}, infinity).
 
 start_link(Args) ->
     gen_server:start_link(?MODULE, Args, []).
@@ -34,20 +33,18 @@ start_link(Args) ->
 %% `gen_server' callbacks.
 %% -------------------------------------------------------------------
 
-init(#{khepri_store := StoreId,
-       callback_mod := Mod}) ->
+init(#{callback_mod := Mod}) ->
     erlang:process_flag(trap_exit, true),
-    State = #?MODULE{khepri_store = StoreId,
-                     callback_mod = Mod},
+    State = #?MODULE{callback_mod = Mod},
     {ok, State}.
 
 handle_call({subscribe, Tables}, _From, State) ->
     {Ret, State1} = do_subscribe(Tables, State),
     {reply, Ret, State1};
-handle_call(flush, _From, State) ->
+handle_call({flush, ModPriv}, _From, State) ->
     try
-        State1 = do_flush(State),
-        {reply, ok, State1}
+        {ModPriv1, State1} = do_flush(ModPriv, State),
+        {reply, {ok, ModPriv1}, State1}
     catch
         throw:Error ->
             {reply, Error, State}
@@ -149,7 +146,7 @@ do_unsubscribe1([Table | Rest]) ->
 do_unsubscribe1([]) ->
     ok.
 
-do_flush(#?MODULE{subscribed_to = SubscribedTo} = State) ->
+do_flush(ModPriv, #?MODULE{subscribed_to = SubscribedTo} = State) ->
     %% Switch all tables to read-only. All concurrent and future Mnesia
     %% transactions involving a write to one of them will fail with the
     %% `{no_exists, Table}' exception.
@@ -162,8 +159,8 @@ do_flush(#?MODULE{subscribed_to = SubscribedTo} = State) ->
     %% During the first round of copy, we received all write events as
     %% messages (parallel writes were authorized). Now, we want to consume
     %% those messages to record the writes we probably missed.
-    State2 = consume_mnesia_events(SubscribedTo, State1),
-    State2.
+    {ModPriv1, State2} = consume_mnesia_events(SubscribedTo, ModPriv, State1),
+    {ModPriv1, State2}.
 
 make_tables_readonly(#?MODULE{subscribed_to = SubscribedTo}) ->
     lists:foreach(
@@ -180,29 +177,21 @@ make_tables_readonly(#?MODULE{subscribed_to = SubscribedTo}) ->
 
 consume_mnesia_events(
   Tables,
-  #?MODULE{khepri_store = StoreId,
-           callback_mod = Mod,
+  ModPriv,
+  #?MODULE{callback_mod = Mod,
            events = Events} = State) ->
     Events1 = lists:reverse(Events),
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Consuming ~b Mnesia events from tables ~0p",
        [length(Events1), Tables],
        #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ModPrivs = lists:foldl(
-                 fun(Table, MPs) ->
-                         case Mod:init_copy_to_khepri(Table, StoreId) of
-                             {ok, ModPriv} -> MPs#{Table => ModPriv};
-                             Error         -> throw(Error)
-                         end
-                 end, #{}, Tables),
-    consume_mnesia_events1(Events1, Mod, ModPrivs),
-    State#?MODULE{events = []}.
+    ModPriv1 = consume_mnesia_events1(Events1, Mod, ModPriv),
+    State1 = State#?MODULE{events = []},
+    {ModPriv1, State1}.
 
-consume_mnesia_events1([{put, Table, Record} | Rest], Mod, ModPrivs) ->
-    ModPriv = maps:get(Table, ModPrivs),
-    case Mod:copy_to_khepri(Record, ModPriv) of
+consume_mnesia_events1([{put, Table, Record} | Rest], Mod, ModPriv) ->
+    case Mod:copy_to_khepri(Table, Record, ModPriv) of
         {ok, ModPriv1} ->
-            ModPrivs1 = ModPrivs#{Table => ModPriv1},
             Remaining = length(Rest),
             if
                 Remaining rem 100 =:= 0 ->
@@ -213,15 +202,13 @@ consume_mnesia_events1([{put, Table, Record} | Rest], Mod, ModPrivs) ->
                 true ->
                     ok
             end,
-            consume_mnesia_events1(Rest, Mod, ModPrivs1);
+            consume_mnesia_events1(Rest, Mod, ModPriv1);
         Error ->
             throw(Error)
     end;
-consume_mnesia_events1([{delete, Table, Key} | Rest], Mod, ModPrivs) ->
-    ModPriv = maps:get(Table, ModPrivs),
-    case Mod:delete_from_khepri(Key, ModPriv) of
+consume_mnesia_events1([{delete, Table, Key} | Rest], Mod, ModPriv) ->
+    case Mod:delete_from_khepri(Table, Key, ModPriv) of
         {ok, ModPriv1} ->
-            ModPrivs1 = ModPrivs#{Table => ModPriv1},
             Remaining = length(Rest),
             if
                 Remaining rem 100 =:= 0 ->
@@ -232,9 +219,9 @@ consume_mnesia_events1([{delete, Table, Key} | Rest], Mod, ModPrivs) ->
                 true ->
                     ok
             end,
-            consume_mnesia_events1(Rest, Mod, ModPrivs1);
+            consume_mnesia_events1(Rest, Mod, ModPriv1);
         Error ->
             throw(Error)
     end;
-consume_mnesia_events1([], _Mod, _ModPrivs) ->
-    ok.
+consume_mnesia_events1([], _Mod, ModPriv) ->
+    ModPriv.

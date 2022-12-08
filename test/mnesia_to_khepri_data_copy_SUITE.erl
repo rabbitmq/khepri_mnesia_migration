@@ -118,7 +118,7 @@ can_copy_existing_data_from_mnesia_to_khepri(Config) ->
     ?assertEqual(
        ok,
        rpc:call(
-         SomeNode, mnesia_to_khepri, copy_data,
+         SomeNode, mnesia_to_khepri, copy_all_tables,
          [StoreId, mnesia_to_khepri_default_converter])),
 
     MnesiaObjects = rpc:call(
@@ -215,7 +215,7 @@ can_copy_data_added_concurrently_from_mnesia_to_khepri(Config) ->
     ?assertEqual(
        ok,
        rpc:call(
-         SomeNode, mnesia_to_khepri, copy_data,
+         SomeNode, mnesia_to_khepri, copy_all_tables,
          [StoreId, mnesia_to_khepri_default_converter])),
 
     MnesiaObjects = rpc:call(

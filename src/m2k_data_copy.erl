@@ -18,6 +18,7 @@
 -record(?MODULE, {tables,
                   khepri_store,
                   callback_mod,
+                  callback_mod_priv,
                   subscriber}).
 
 proceed(SupPid) ->
@@ -42,42 +43,33 @@ start_link(Args) ->
 %% -------------------------------------------------------------------
 
 init(#{khepri_store := StoreId,
-       callback_mod := Mod} = Args) ->
+       tables := Tables,
+       callback_mod := Mod}) ->
     erlang:process_flag(trap_exit, true),
-    Tables0 = case Args of
-                  #{tables := T} -> T;
-                  _              -> lists:sort(mnesia:system_info(tables))
-              end,
-    Tables1 = Tables0 -- [schema],
-    case Tables1 of
-        [] ->
-            ignore;
-        _ ->
-            State = #?MODULE{khepri_store = StoreId,
-                             callback_mod = Mod,
-                             tables = Tables1},
-            {ok, State}
-    end.
+    State = #?MODULE{khepri_store = StoreId,
+                     callback_mod = Mod,
+                     tables = Tables},
+    {ok, State}.
 
 handle_call({proceed, SubscriberPid}, _From, State) ->
     State1 = State#?MODULE{subscriber = SubscriberPid},
-    Ret = try
-              do_copy_data(State1)
-          catch
-              throw:?kmm_error(_, _) = Reason ->
-                  ?LOG_ERROR(
-                     "Failed to copy Mnesia->Khepri data: ~0p",
-                     [Reason],
-                     #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-                  {error, Reason};
-              error:?kmm_exception(_, _) = Exception ->
-                  ?LOG_ERROR(
-                     "Exception during Mnesia->Khepri data copy: ~0p",
-                     [Exception],
-                     #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-                  {exception, Exception}
-          end,
-    {stop, normal, Ret, State1};
+    try
+        State2 = do_copy_data(State1),
+        {stop, normal, ok, State2}
+    catch
+        throw:?kmm_error(_, _) = Reason ->
+            ?LOG_ERROR(
+               "Failed to copy Mnesia->Khepri data: ~0p",
+               [Reason],
+               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+            {stop, normal, {error, Reason}, State1};
+        error:?kmm_exception(_, _) = Exception ->
+            ?LOG_ERROR(
+               "Exception during Mnesia->Khepri data copy: ~0p",
+               [Exception],
+               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+            {stop, normal, {exception, Exception}, State1}
+    end;
 handle_call(Request, _From, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_call message: ~p",
@@ -106,35 +98,45 @@ terminate(_Reason, _State) ->
 %% Internal functions.
 %% -------------------------------------------------------------------
 
-do_copy_data(#?MODULE{tables = Tables} = State) ->
+do_copy_data(State) ->
     ?LOG_INFO(
        "Copying data from Mnesia to Khepri",
        #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
 
+    State1 = init_callback_mod(State),
+    subscribe_to_mnesia_changes(State1),
+    State2 = copy_from_mnesia_to_khepri(State1),
+    State3 = final_sync_from_mnesia_to_khepri(State2),
+    State4 = finish_callback_mod(State3),
+
+    State4.
+
+init_callback_mod(
+  #?MODULE{tables = Tables,
+           khepri_store = StoreId,
+           callback_mod = Mod} = State) ->
     ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Copying from Mnesia tables: ~0p",
+       "Mnesia->Khepri data copy: Initial callback mod ~s for Mnesia "
+       "tables: ~0p",
        [Tables],
        #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Subscribe to Mnesia changes",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = subscribe_to_mnesia_changes(State),
-
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Start actual data copy",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = copy_from_mnesia_to_khepri(State),
-
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: Final sync",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
-    ok = final_sync_from_mnesia_to_khepri(State),
-
-    ok.
+    case Mod:init_copy_to_khepri(Tables, StoreId) of
+        {ok, ModPriv} ->
+            State#?MODULE{callback_mod_priv = ModPriv};
+        Error ->
+            throw(
+              ?kmm_error(
+                 callback_mod_error,
+                 #{callback_mod => Mod,
+                   tables => Tables,
+                   error => Error}))
+    end.
 
 subscribe_to_mnesia_changes(
   #?MODULE{tables = Tables, subscriber = SubscriberPid}) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: Subscribe to Mnesia changes",
+       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
     case m2k_subscriber:subscribe(SubscriberPid, Tables) of
         ok ->
             ok;
@@ -149,18 +151,62 @@ subscribe_to_mnesia_changes(
 copy_from_mnesia_to_khepri(
   #?MODULE{khepri_store = StoreId,
            tables = Tables,
-           callback_mod = Mod} = _State) ->
+           callback_mod = Mod,
+           callback_mod_priv = ModPriv} = State) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: Start actual data copy",
+       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
     case mnesia:activate_checkpoint([{min, Tables}]) of
         {ok, Checkpoint, _Nodes} ->
-            Args = #{callback_mod => Mod,
-                     tables => Tables,
-                     khepri_store => StoreId},
+            Args = #{khepri_store => StoreId,
+                     callback_mod => Mod,
+                     callback_mod_priv => ModPriv,
+                     data_copy_pid => self()},
             Ret = mnesia:backup_checkpoint(Checkpoint, Args, m2k_export),
             _ = mnesia:deactivate_checkpoint(Checkpoint),
-            Ret;
+            ModPriv1 = receive
+                           {m2k_export, MP} -> MP
+                       after 0 ->
+                                 ModPriv
+                       end,
+            case Ret of
+                ok ->
+                    State#?MODULE{callback_mod_priv = ModPriv1};
+                Error ->
+                    throw(
+                      ?kmm_error(
+                         callback_mod_error,
+                         #{callback_mod => Mod,
+                           error => Error}))
+            end;
         Error ->
-            Error
+            throw(
+              ?kmm_error(
+                 failed_to_activate_mnesia_checkpoint,
+                 #{tables => Tables,
+                   error => Error}))
     end.
 
-final_sync_from_mnesia_to_khepri(#?MODULE{subscriber = SubscriberPid}) ->
-    m2k_subscriber:flush(SubscriberPid).
+final_sync_from_mnesia_to_khepri(
+  #?MODULE{subscriber = SubscriberPid,
+          callback_mod = Mod,
+          callback_mod_priv = ModPriv} = State) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: Final sync",
+       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+    case m2k_subscriber:flush(SubscriberPid, ModPriv) of
+        {ok, ModPriv1} ->
+            State#?MODULE{callback_mod_priv = ModPriv1};
+        Error ->
+            throw(
+              ?kmm_error(
+                 callback_mod_error,
+                 #{callback_mod => Mod,
+                   error => Error}))
+    end.
+
+finish_callback_mod(
+  #?MODULE{callback_mod = Mod,
+           callback_mod_priv = ModPriv} = State) ->
+    Mod:finish_copy_to_khepri(ModPriv),
+    State#?MODULE{callback_mod_priv = undefined}.

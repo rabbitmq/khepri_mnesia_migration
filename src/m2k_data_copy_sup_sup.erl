@@ -3,7 +3,7 @@
 -behaviour(supervisor).
 
 -export([start_link/0,
-         prepare_workers_sup/2]).
+         prepare_workers_sup/3]).
 
 -export([init/1]).
 
@@ -12,8 +12,9 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-prepare_workers_sup(StoreId, Mod) ->
+prepare_workers_sup(StoreId, Tables, Mod) ->
     supervisor:start_child(?SERVER, [#{khepri_store => StoreId,
+                                       tables => Tables,
                                        callback_mod => Mod}]).
 
 init([]) ->

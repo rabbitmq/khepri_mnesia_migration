@@ -5,30 +5,33 @@
 -include("src/kmm_logging.hrl").
 
 -export([init_copy_to_khepri/2,
-         copy_to_khepri/2,
-         delete_from_khepri/2,
+         copy_to_khepri/3,
+         delete_from_khepri/3,
          finish_copy_to_khepri/1]).
 
--record(?MODULE, {table,
+-record(?MODULE, {tables,
                   store_id,
                   index_positions}).
 
-init_copy_to_khepri(Table, StoreId) ->
+init_copy_to_khepri(Tables, StoreId) ->
+    State = #?MODULE{store_id = StoreId},
+    init_copy_to_khepri1(Tables, State).
+
+init_copy_to_khepri1([Table | Rest], State) ->
     case mnesia:table_info(Table, type) of
         set ->
-            State = #?MODULE{table = Table,
-                             store_id = StoreId},
-            {ok, State};
+            init_copy_to_khepri1(Rest, State);
         Type ->
             {error, {?MODULE, mnesia_table_type_unsupported,
                      #{table => Table,
                        type => Type}}}
-    end.
+    end;
+init_copy_to_khepri1([], State) ->
+    {ok, State}.
 
 copy_to_khepri(
-  Record,
-  #?MODULE{table = Table,
-           store_id = StoreId} = State) ->
+  Table, Record,
+  #?MODULE{store_id = StoreId} = State) ->
     Key = element(2, Record),
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] key: ~0p",
@@ -54,9 +57,8 @@ copy_to_khepri(
     end.
 
 delete_from_khepri(
-  Key,
-  #?MODULE{table = Table,
-           store_id = StoreId} = State) ->
+  Table, Key,
+  #?MODULE{store_id = StoreId} = State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] key: ~0p",
        [Key],
