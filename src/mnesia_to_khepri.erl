@@ -19,8 +19,8 @@ copy_tables(Tables, Mod) ->
     copy_tables(StoreId, Tables, Mod).
 
 copy_tables(StoreId, Tables, Mod) when is_list(Tables) andalso Tables =/= [] ->
-    case m2k_data_copy_sup_sup:prepare_workers_sup(StoreId, Tables, Mod) of
-        {ok, Pid} when is_pid(Pid) -> m2k_data_copy:proceed(Pid);
+    case m2k_table_copy_sup_sup:prepare_workers_sup(StoreId, Tables, Mod) of
+        {ok, Pid} when is_pid(Pid) -> m2k_table_copy:proceed(Pid);
         {error, _} = Error         -> Error
     end.
 

@@ -36,7 +36,7 @@ copy_to_khepri(
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] key: ~0p",
        [Key],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     Supported = is_atom(Key) orelse is_binary(Key),
     case Supported of
         true ->
@@ -44,7 +44,7 @@ copy_to_khepri(
             ?LOG_DEBUG(
                "Mnesia->Khepri data copy: [" ?MODULE_STRING "] path: ~0p",
                [Path],
-               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+               #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
             case khepri:put(StoreId, Path, Record) of
                 ok    -> {ok, State};
                 Error -> Error
@@ -62,7 +62,7 @@ delete_from_khepri(
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] key: ~0p",
        [Key],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     Supported = is_atom(Key) orelse is_binary(Key),
     case Supported of
         true ->
@@ -70,7 +70,7 @@ delete_from_khepri(
             ?LOG_DEBUG(
                "Mnesia->Khepri data copy: [" ?MODULE_STRING "] path: ~0p",
                [Path],
-               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+               #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
             case khepri:delete(StoreId, Path) of
                 ok    -> {ok, State};
                 Error -> Error

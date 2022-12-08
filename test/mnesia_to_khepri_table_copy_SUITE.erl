@@ -5,7 +5,7 @@
 %% Copyright © 2022 VMware, Inc. or its affiliates. All rights reserved.
 %%
 
--module(mnesia_to_khepri_data_copy_SUITE).
+-module(mnesia_to_khepri_table_copy_SUITE).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("eunit/include/eunit.hrl").

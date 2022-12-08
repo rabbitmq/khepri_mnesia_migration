@@ -1,4 +1,4 @@
--module(m2k_data_copy).
+-module(m2k_table_copy).
 
 -behaviour(gen_server).
 
@@ -22,12 +22,12 @@
                   subscriber}).
 
 proceed(SupPid) ->
-    [{m2k_data_copy, DataCopyPid, _, _},
-     {m2k_subscriber, SubscriberPid, _, _}] =
+    [{m2k_subscriber, SubscriberPid, _, _},
+     {m2k_table_copy, TableCopyPid, _, _}] =
     lists:sort(supervisor:which_children(SupPid)),
 
     Ret = gen_server:call(
-            DataCopyPid, {?FUNCTION_NAME, SubscriberPid}, infinity),
+            TableCopyPid, {?FUNCTION_NAME, SubscriberPid}, infinity),
     case Ret of
         {exception, ?kmm_exception(_, _) = Exception} ->
             ?kmm_misuse(Exception);
@@ -61,34 +61,34 @@ handle_call({proceed, SubscriberPid}, _From, State) ->
             ?LOG_ERROR(
                "Failed to copy Mnesia->Khepri data: ~0p",
                [Reason],
-               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+               #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
             {stop, normal, {error, Reason}, State1};
         error:?kmm_exception(_, _) = Exception ->
             ?LOG_ERROR(
                "Exception during Mnesia->Khepri data copy: ~0p",
                [Exception],
-               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+               #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
             {stop, normal, {exception, Exception}, State1}
     end;
 handle_call(Request, _From, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_call message: ~p",
        [Request],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     {reply, undefined, State}.
 
 handle_cast(Request, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_cast message: ~p",
        [Request],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     {noreply, State}.
 
 handle_info(Msg, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_info message: ~p",
        [Msg],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -101,7 +101,7 @@ terminate(_Reason, _State) ->
 do_copy_data(State) ->
     ?LOG_INFO(
        "Copying data from Mnesia to Khepri",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
 
     State1 = init_callback_mod(State),
     subscribe_to_mnesia_changes(State1),
@@ -119,7 +119,7 @@ init_callback_mod(
        "Mnesia->Khepri data copy: Initial callback mod ~s for Mnesia "
        "tables: ~0p",
        [Tables],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     case Mod:init_copy_to_khepri(Tables, StoreId) of
         {ok, ModPriv} ->
             State#?MODULE{callback_mod_priv = ModPriv};
@@ -136,7 +136,7 @@ subscribe_to_mnesia_changes(
   #?MODULE{tables = Tables, subscriber = SubscriberPid}) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Subscribe to Mnesia changes",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     case m2k_subscriber:subscribe(SubscriberPid, Tables) of
         ok ->
             ok;
@@ -155,13 +155,13 @@ copy_from_mnesia_to_khepri(
            callback_mod_priv = ModPriv} = State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Start actual data copy",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     case mnesia:activate_checkpoint([{min, Tables}]) of
         {ok, Checkpoint, _Nodes} ->
             Args = #{khepri_store => StoreId,
                      callback_mod => Mod,
                      callback_mod_priv => ModPriv,
-                     data_copy_pid => self()},
+                     table_copy_pid => self()},
             Ret = mnesia:backup_checkpoint(Checkpoint, Args, m2k_export),
             _ = mnesia:deactivate_checkpoint(Checkpoint),
             ModPriv1 = receive
@@ -193,7 +193,7 @@ final_sync_from_mnesia_to_khepri(
           callback_mod_priv = ModPriv} = State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Final sync",
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     case m2k_subscriber:flush(SubscriberPid, ModPriv) of
         {ok, ModPriv1} ->
             State#?MODULE{callback_mod_priv = ModPriv1};

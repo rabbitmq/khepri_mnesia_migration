@@ -281,6 +281,21 @@ mnesia_must_run(Config) ->
              #{node := Node2}), _}}},
        rpc:call(Node2, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
 
+    lists:foreach(
+      fun(_) ->
+              Ret = rpc:call(
+                      Node3,
+                      mnesia_to_khepri, sync_cluster_membership, [StoreId]),
+              case Ret of
+                  {badrpc,
+                   {'EXIT',
+                    {?kmm_exception(all_mnesia_nodes_must_run, _)}}} ->
+                      ok;
+                  _ ->
+                      timer:sleep(500)
+              end
+      end, lists:seq(1, 20)),
+
     ?assertMatch(
        {badrpc,
         {'EXIT',

@@ -53,14 +53,14 @@ handle_call(Request, _From, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_call message: ~p",
        [Request],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     {reply, undefined, State}.
 
 handle_cast(Request, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_cast message: ~p",
        [Request],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     {noreply, State}.
 
 handle_info(
@@ -89,7 +89,7 @@ handle_info(Msg, State) ->
     ?LOG_WARNING(
        ?MODULE_STRING ": Unhandled handle_info message: ~p",
        [Msg],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     {noreply, State}.
 
 terminate(_Reason, State) ->
@@ -104,7 +104,7 @@ do_subscribe([Table | Rest], #?MODULE{subscribed_to = SubscribedTo} = State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Subscribe to changes to ~ts",
        [Table],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     case mnesia:subscribe({table, Table, detailed}) of
         {ok, _} ->
             SubscribedTo1 = [Table | SubscribedTo],
@@ -115,7 +115,7 @@ do_subscribe([Table | Rest], #?MODULE{subscribed_to = SubscribedTo} = State) ->
                "Mnesia->Khepri data copy: Failed to subscribe to changes "
                "to ~ts",
                [Table],
-               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+               #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
             State1 = do_unsubscribe(State),
             {Error, State1}
     end;
@@ -131,7 +131,7 @@ do_unsubscribe1([Table | Rest]) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Unsubscribe to changes to ~ts",
        [Table],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     case mnesia:unsubscribe({table, Table, detailed}) of
         {ok, _} ->
             do_unsubscribe1(Rest);
@@ -140,7 +140,7 @@ do_unsubscribe1([Table | Rest]) ->
                "Mnesia->Khepri data copy: Failed to subscribe to changes "
                "to ~ts: ~p",
                [Table, Error],
-               #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+               #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
             do_unsubscribe1(Rest)
     end;
 do_unsubscribe1([]) ->
@@ -168,7 +168,7 @@ make_tables_readonly(#?MODULE{subscribed_to = SubscribedTo}) ->
               ?LOG_DEBUG(
                  "Mnesia->Khepri data copy: Mark table ~ts as read-only",
                  [Table],
-                 #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+                 #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
               case mnesia:change_table_access_mode(Table, read_only) of
                   {atomic, ok}                              -> ok;
                   {aborted, {already_exists, _, read_only}} -> ok
@@ -184,7 +184,7 @@ consume_mnesia_events(
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: Consuming ~b Mnesia events from tables ~0p",
        [length(Events1), Tables],
-       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN}),
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
     ModPriv1 = consume_mnesia_events1(Events1, Mod, ModPriv),
     State1 = State#?MODULE{events = []},
     {ModPriv1, State1}.
@@ -198,7 +198,7 @@ consume_mnesia_events1([{put, Table, Record} | Rest], Mod, ModPriv) ->
                     ?LOG_DEBUG(
                        "Mnesia->Khepri data copy: ~b Mnesia events left",
                        [Remaining],
-                       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN});
+                       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN});
                 true ->
                     ok
             end,
@@ -215,7 +215,7 @@ consume_mnesia_events1([{delete, Table, Key} | Rest], Mod, ModPriv) ->
                     ?LOG_DEBUG(
                        "Mnesia->Khepri data copy: ~b Mnesia events left",
                        [Remaining],
-                       #{domain => ?KMM_M2K_DATA_COPY_LOG_DOMAIN});
+                       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN});
                 true ->
                     ok
             end,

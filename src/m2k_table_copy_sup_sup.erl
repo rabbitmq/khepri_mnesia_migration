@@ -1,4 +1,4 @@
--module(m2k_data_copy_sup_sup).
+-module(m2k_table_copy_sup_sup).
 
 -behaviour(supervisor).
 
@@ -18,12 +18,12 @@ prepare_workers_sup(StoreId, Tables, Mod) ->
                                        callback_mod => Mod}]).
 
 init([]) ->
-    M2KDataCopySup = #{id => m2k_data_copy_sup,
-                       restart => temporary,
-                       start => {m2k_data_copy_sup, start_link, []}},
+    M2KTableCopySup = #{id => m2k_table_copy_sup,
+                        restart => temporary,
+                        start => {m2k_table_copy_sup, start_link, []}},
 
     SupFlags = #{strategy => simple_one_for_one,
                  intensity => 0,
                  period => 1},
-    ChildSpecs = [M2KDataCopySup],
+    ChildSpecs = [M2KTableCopySup],
     {ok, {SupFlags, ChildSpecs}}.
