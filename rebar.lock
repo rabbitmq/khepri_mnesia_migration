@@ -3,7 +3,7 @@
  {<<"gen_batch_server">>,{pkg,<<"gen_batch_server">>,<<"0.8.8">>},2},
  {<<"khepri">>,
   {git,"https://github.com/rabbitmq/khepri.git",
-       {ref,"38e2fae9a03c4e0fc1a9878f6d80e007eb4af25c"}},
+       {ref,"30c0c66a03b6860d27dfc04d175b7e2367419284"}},
   0},
  {<<"ra">>,{pkg,<<"ra">>,<<"2.4.0">>},1},
  {<<"seshat">>,{pkg,<<"seshat">>,<<"0.3.2">>},2}]}.

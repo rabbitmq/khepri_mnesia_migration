@@ -25,13 +25,15 @@
          end_per_testcase/2,
 
          can_copy_existing_data_from_mnesia_to_khepri/1,
-         can_copy_data_added_concurrently_from_mnesia_to_khepri/1]).
+         can_copy_data_added_concurrently_from_mnesia_to_khepri/1,
+         only_one_migration_allowed_at_a_time/1]).
 
 -record(my_record, {key, value}).
 
 all() ->
     [can_copy_existing_data_from_mnesia_to_khepri,
-     can_copy_data_added_concurrently_from_mnesia_to_khepri].
+     can_copy_data_added_concurrently_from_mnesia_to_khepri,
+     only_one_migration_allowed_at_a_time].
 
 groups() ->
     [].
@@ -217,6 +219,88 @@ can_copy_data_added_concurrently_from_mnesia_to_khepri(Config) ->
        rpc:call(
          SomeNode, mnesia_to_khepri, copy_all_tables,
          [StoreId, mnesia_to_khepri_default_converter])),
+
+    MnesiaObjects = rpc:call(
+                      SomeNode,
+                      mnesia, dirty_match_object, [#my_record{_ = '_'}]),
+    {ok, KhepriObjects} = rpc:call(
+                            SomeNode,
+                            khepri, get_many,
+                            [StoreId, [my_record, ?KHEPRI_WILDCARD_STAR]]),
+
+    ?assertNotEqual([], MnesiaObjects),
+    ?assertEqual(
+       lists:sort(MnesiaObjects),
+       lists:sort(maps:values(KhepriObjects))),
+
+    ok.
+
+only_one_migration_allowed_at_a_time(Config) ->
+    PropsPerNode = ?config(ra_system_props, Config),
+    Nodes = lists:sort(maps:keys(PropsPerNode)),
+    SomeNode = lists:nth(2, Nodes),
+
+    %% We assume all nodes are using the same Ra system name & store ID.
+    #{ra_system := RaSystem} = maps:get(SomeNode, PropsPerNode),
+    StoreId = RaSystem,
+
+    helpers:cluster_mnesia_nodes(Nodes),
+
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(
+                 {ok, StoreId},
+                 rpc:call(Node, khepri, start, [RaSystem, StoreId]))
+      end, Nodes),
+
+    ?assertEqual(
+       ok,
+       rpc:call(
+         SomeNode, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
+    ?assertEqual(
+       {atomic, ok},
+       rpc:call(
+         SomeNode, mnesia, create_table,
+         [my_record, [{attributes, record_info(fields, my_record)},
+                      {disc_copies, Nodes}]])),
+    ?assertEqual(
+       {atomic, ok},
+       rpc:call(
+         SomeNode, mnesia, transaction,
+         [fun() ->
+                  lists:foreach(
+                    fun(I) ->
+                            Key = make_key(I),
+                            Value = make_value(I),
+                            mnesia:write(#my_record{key = Key, value = Value})
+                    end, lists:seq(1, 1000))
+          end])),
+
+    Parent = self(),
+    Pids = [spawn(
+              fun() ->
+                      Ret = rpc:call(
+                              SomeNode, mnesia_to_khepri, copy_all_tables,
+                              [StoreId, mnesia_to_khepri_default_converter]),
+                      Parent ! {self(), Ret}
+              end) || _ <- lists:seq(1, 5)],
+    Rets = lists:map(
+             fun(Pid) ->
+                     receive {Pid, Ret} -> Ret end
+             end, Pids),
+    [Ok | Errors] = lists:sort(Rets),
+    ?assertEqual(ok, Ok),
+    ?assertEqual(
+       Errors,
+       [Error || Error <- Errors,
+                 Error =:= ok orelse
+                 (is_tuple(Error) andalso
+                  size(Error) =:= 2 andalso
+                  element(1, Error) =:= error andalso
+                  is_tuple(element(2, Error)) andalso
+                  size(element(2, Error)) =:= 2 andalso
+                  element(1, element(2, Error)) =:= already_started andalso
+                  is_pid(element(2, element(2, Error))))]),
 
     MnesiaObjects = rpc:call(
                       SomeNode,
