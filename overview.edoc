@@ -1,0 +1,13 @@
+@author Jean-Sébastien Pédron <jean-sebastien@rabbitmq.com>
+@author The RabbitMQ team <info@rabbitmq.com>
+@copyright 2022-2023 VMware, Inc. or its affiliates.  All rights reserved.
+@title The Mnesia↔Khepri migration toolkit
+@version Development branch
+
+@doc
+`khepri_mnesia_migration' is a library providing helpers to migrate data
+between the Mnesia and Khepri databases.
+
+Currently, only the migration from Mnesia to Khepri is supported.
+
+<a class="github-fork-ribbon" href="https://github.com/rabbitmq/khepri_mnesia_migration" data-ribbon="Fork me on GitHub" title="Fork me on GitHub">Fork me on GitHub</a>

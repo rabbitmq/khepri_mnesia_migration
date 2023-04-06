@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module mnesia_to_khepri</title>
+<link rel="stylesheet" type="text/css" href="edoc-extensions.css" title="EDoc">
+<link rel="icon" href="kmm-favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
+</head>
+<body class="markdown-body language-erlang"><script src="prism.js"></script>
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module mnesia_to_khepri</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>Helpers to migrate from Mnesia to Khepri.
+
+
+<h2><a name="description">Description</a></h2>Helpers to migrate from Mnesia to Khepri.
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-mnesia_table">mnesia_table()</a></h3>
+<p><code>mnesia_table() = atom()</code></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#sync_cluster_membership-0">sync_cluster_membership/0</a></td><td>Ensures the default Khepri store has the same members as the Mnesia
+  cluster.</td></tr>
+<tr><td valign="top"><a href="#sync_cluster_membership-1">sync_cluster_membership/1</a></td><td>Ensures the Khepri store named <code>StoreId</code> has the same members as the  
+Mnesia cluster.</td></tr>
+<tr><td valign="top"><a href="#copy_tables-2">copy_tables/2</a></td><td>Copies records from Mnesia tables <code>Tables</code> to the default Khepri
+  store.</td></tr>
+<tr><td valign="top"><a href="#copy_tables-3">copy_tables/3</a></td><td>Copies records from Mnesia tables <code>Tables</code> to the Khepri store named
+  <code>StoreId</code>.</td></tr>
+<tr><td valign="top"><a href="#copy_all_tables-1">copy_all_tables/1</a></td><td>Copies records from all Mnesia tables to the default Khepri store.</td></tr>
+<tr><td valign="top"><a href="#copy_all_tables-2">copy_all_tables/2</a></td><td>Copies records from all Mnesia tables to the Khepri store named
+  <code>StoreId</code>.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="sync_cluster_membership-0">sync_cluster_membership/0</a></h3>
+<div class="spec">
+<p><code>sync_cluster_membership() -&gt; ok</code><br></p>
+<p></p>
+</div><p>Ensures the default Khepri store has the same members as the Mnesia
+  cluster.
+ </p>
+<p><b>See also:</b> <a href="#sync_cluster_membership-1">sync_cluster_membership/1</a>.</p>
+
+<h3 class="function"><a name="sync_cluster_membership-1">sync_cluster_membership/1</a></h3>
+<div class="spec">
+<p><code>sync_cluster_membership(StoreId) -&gt; ok</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li></ul></p>
+<p></p>
+</div><p><p>Ensures the Khepri store named <code>StoreId</code> has the same members as the  
+Mnesia cluster.</p>
+ 
+  The synchronization is split into the following steps:
+  <ol>
+  <li>Mnesia is queried to list all its members. We ensure that all Mnesia
+  members are running at this point: if some members are down, there is
+  little chance that Khepri will work on those anyway.</li>
+  <li>All Mnesia members are queried to learn about the membership status of
+  all "instances" of the Khepri store named <code>StoreId</code>.</li>
+  <li>Among all instances of the Khepri store, one instance is selected to be
+  the one that will be joined by other nodes. The selection process is
+  described below.</li>
+  <li>Other nodes are reset, meaning their data is dropped, and they are
+  added to the selected Khepri store.</li>
+  </ol>
+ 
+  <p>The synchronization process has to select a store instance that will grow  
+and other store instances that will be reset. The criterias below are  
+evaluated to sort the list of store instances, then the first instance in  
+that list is selected as the winning instance.</p>
+ 
+  <p>Criterias are evaluated in order. For a given criteria, if both sides are  
+equal, the next criteria is evaluated until one criteria gives an instance  
+"greater" than another.</p>
+ 
+  Here is the ordered list of criterias:
+  <ol>
+  <li>A Khepri store instance with more members gets precedence.</li>
+  <li>Then, a Khepri store instance with more tree nodes (more records) gets
+  precedence.</li>
+  <li>Then, a Khepri store instance where a member's Erlang node runs for the
+  longest time gets precedence.</li>
+  <li>Then, a Khepri store instance where its members list sorts before
+  another members list gets precedence.</li>
+  </ol>
+ 
+  Here are some examples:
+  <ul>
+  <li>A Khepri store instance with 3 members will be selected before another
+  Khepri store instance with 1 member.</li>
+  <li>If they have the same number of members, a Khepri store instance with
+  125 tree nodes will be selected before another Khepri store instance with
+  34 tree nodes.</li>
+  <li>If they have the same number of members and the same number of tree
+  nodes, a Khepri store instance where the oldest Erlang node runs for 67
+  days will be selected before another Khepri store instance where the oldest
+  Erlang node runs for 3 days.</li>
+  </ul></p>
+
+<h3 class="function"><a name="copy_tables-2">copy_tables/2</a></h3>
+<div class="spec">
+<p><code>copy_tables(Tables, Mod) -&gt; ok</code>
+<ul class="definitions"><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module()</code></li></ul></p>
+<p></p>
+</div><p>Copies records from Mnesia tables <code>Tables</code> to the default Khepri
+  store.
+ </p>
+<p><b>See also:</b> <a href="#copy_tables-3">copy_tables/3</a>.</p>
+
+<h3 class="function"><a name="copy_tables-3">copy_tables/3</a></h3>
+<div class="spec">
+<p><code>copy_tables(StoreId, Tables, Mod) -&gt; ok</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module()</code></li></ul></p>
+<p></p>
+</div><p><p>Copies records from Mnesia tables <code>Tables</code> to the Khepri store named
+  <code>StoreId</code>.</p>
+ 
+  <p>The callback module <code>Mod</code> is responsible for storing each Mnesia record in
+  the Khepri store. How it is called is described below. <a docgen-rel="seeerl" docgen-href="mnesia_to_khepri_default_converter" href="mnesia_to_khepri_default_converter.html"><code>mnesia_to_khepri_default_converter</code></a> can be used as the default callback  
+module or as an example to write a new one.</p>
+ 
+  The copy is split into the following steps:
+  <ol>
+  <li>The PID of the Erlang process working on the copy is stored in the
+  Khepri store. This serves as an indicator that tables are being copied and
+  this prevents concurrent copy from happening.</li>
+  <li>The callback module state is initialized using its
+  <code>Mod:init_copy_to_khepri/2</code> function.</li>
+  <li>The copy process subscribes to changes from Mnesia.</li>
+  <li>The copy process copies records from Mnesia using its Backup &amp;
+  Restore API. The process uses <code>Mod:copy_to_khepri/3</code> for each Mnesia
+  record.</li>
+  <li>The copy process marks all involved Mnesia tables as read-only.</li>
+  <li>The copy process consumes all Mnesia events it received during the
+  initial copy and calls <code>Mod:copy_to_khepri/3</code> and
+  <code>Mod:delete_from_khepri/3</code> to update the Khepri store accordingly.</li>
+  <li>The "migration in progress" marker is removed from the Khepri
+  store.</li>
+  <li>The copy process calls <code>Mod:finish_callback_mod/1</code> to let the callback
+  module do any cleanups.</li>
+  </ol>
+ 
+  Copied Mnesia tables continue to be available during the process, except
+  after they are marked as read-only.</p>
+
+<h3 class="function"><a name="copy_all_tables-1">copy_all_tables/1</a></h3>
+<div class="spec">
+<p><code>copy_all_tables(Mod) -&gt; ok</code>
+<ul class="definitions"><li><code>Mod = module()</code></li></ul></p>
+<p></p>
+</div><p>Copies records from all Mnesia tables to the default Khepri store.
+ </p>
+<p><b>See also:</b> <a href="#copy_tables-3">copy_tables/3</a>.</p>
+
+<h3 class="function"><a name="copy_all_tables-2">copy_all_tables/2</a></h3>
+<div class="spec">
+<p><code>copy_all_tables(StoreId, Mod) -&gt; ok</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Mod = module()</code></li></ul></p>
+<p></p>
+</div><p>Copies records from all Mnesia tables to the Khepri store named
+  <code>StoreId</code>.
+ </p>
+<p><b>See also:</b> <a href="#copy_tables-3">copy_tables/3</a>.</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

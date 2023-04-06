@@ -1,0 +1,35 @@
+body > h2.indextitle:first-of-type
+{
+    font-size: 1.3em;
+    text-align: center;
+    border-bottom: 0px;
+    font-family: "DejaVu Sans Mono", monospace;
+    overflow-wrap: normal;
+
+    padding-top: 115px;
+    background-image: url("kmm-logo.svg");
+    background-size: auto 100px;
+    background-repeat: no-repeat;
+    background-position: top;
+}
+
+.navbar
+{
+    background-color: rgb(245, 242, 240);
+    border-radius: 6px;
+}
+
+.navbar table tr
+{
+    background-color: transparent;
+}
+
+.navbar table td:last-of-type
+{
+    display: none;
+}
+
+.navbar + hr
+{
+    display: none;
+}
