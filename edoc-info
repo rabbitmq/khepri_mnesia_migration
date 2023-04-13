@@ -1,3 +1,4 @@
 %% encoding: UTF-8
 {application,khepri_mnesia_migration}.
-{modules,[mnesia_to_khepri,mnesia_to_khepri_default_converter]}.
+{modules,[mnesia_to_khepri,mnesia_to_khepri_converter,
+          mnesia_to_khepri_default_converter]}.

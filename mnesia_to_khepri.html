@@ -34,6 +34,12 @@ Mnesia cluster.</td></tr>
 <tr><td valign="top"><a href="#copy_all_tables-1">copy_all_tables/1</a></td><td>Copies records from all Mnesia tables to the default Khepri store.</td></tr>
 <tr><td valign="top"><a href="#copy_all_tables-2">copy_all_tables/2</a></td><td>Copies records from all Mnesia tables to the Khepri store named
   <code>StoreId</code>.</td></tr>
+<tr><td valign="top"><a href="#is_table_migrated-1">is_table_migrated/1</a></td><td>Returns the migration status of the specified table.</td></tr>
+<tr><td valign="top"><a href="#is_table_migrated-2">is_table_migrated/2</a></td><td>Returns the migration status of the specified table.</td></tr>
+<tr><td valign="top"><a href="#wait_for_table_migration-2">wait_for_table_migration/2</a></td><td>Waits for <code>Table</code> to be migrated.</td></tr>
+<tr><td valign="top"><a href="#wait_for_table_migration-3">wait_for_table_migration/3</a></td><td>Waits for <code>Table</code> to be migrated.</td></tr>
+<tr><td valign="top"><a href="#handle_fallback-2">handle_fallback/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#handle_fallback-3">handle_fallback/3</a></td><td></td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
@@ -105,7 +111,7 @@ equal, the next criteria is evaluated until one criteria gives an instance
 <h3 class="function"><a name="copy_tables-2">copy_tables/2</a></h3>
 <div class="spec">
 <p><code>copy_tables(Tables, Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module()</code></li></ul></p>
+<ul class="definitions"><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
 <p></p>
 </div><p>Copies records from Mnesia tables <code>Tables</code> to the default Khepri
   store.
@@ -115,7 +121,7 @@ equal, the next criteria is evaluated until one criteria gives an instance
 <h3 class="function"><a name="copy_tables-3">copy_tables/3</a></h3>
 <div class="spec">
 <p><code>copy_tables(StoreId, Tables, Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module()</code></li></ul></p>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
 <p></p>
 </div><p><p>Copies records from Mnesia tables <code>Tables</code> to the Khepri store named
   <code>StoreId</code>.</p>
@@ -130,7 +136,8 @@ module or as an example to write a new one.</p>
   Khepri store. This serves as an indicator that tables are being copied and
   this prevents concurrent copy from happening.</li>
   <li>The callback module state is initialized using its
-  <code>Mod:init_copy_to_khepri/2</code> function.</li>
+  <code>Mod:init_copy_to_khepri/2</code> function, or <code>Mod:init_copy_to_khepri/3</code> if
+  <code>ModArgs</code> is set.</li>
   <li>The copy process subscribes to changes from Mnesia.</li>
   <li>The copy process copies records from Mnesia using its Backup &amp;
   Restore API. The process uses <code>Mod:copy_to_khepri/3</code> for each Mnesia
@@ -151,7 +158,7 @@ module or as an example to write a new one.</p>
 <h3 class="function"><a name="copy_all_tables-1">copy_all_tables/1</a></h3>
 <div class="spec">
 <p><code>copy_all_tables(Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>Mod = module()</code></li></ul></p>
+<ul class="definitions"><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
 <p></p>
 </div><p>Copies records from all Mnesia tables to the default Khepri store.
  </p>
@@ -160,12 +167,52 @@ module or as an example to write a new one.</p>
 <h3 class="function"><a name="copy_all_tables-2">copy_all_tables/2</a></h3>
 <div class="spec">
 <p><code>copy_all_tables(StoreId, Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Mod = module()</code></li></ul></p>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
 <p></p>
 </div><p>Copies records from all Mnesia tables to the Khepri store named
   <code>StoreId</code>.
  </p>
 <p><b>See also:</b> <a href="#copy_tables-3">copy_tables/3</a>.</p>
+
+<h3 class="function"><a name="is_table_migrated-1">is_table_migrated/1</a></h3>
+<div class="spec">
+<p><code>is_table_migrated(Table) -&gt; Migrated</code>
+<ul class="definitions"><li><code>Table = <a href="#type-mnesia_table">mnesia_table()</a></code></li><li><code>Migrated = boolean() | {in_progress, pid()} | undefined</code></li></ul></p>
+<p></p>
+</div><p>Returns the migration status of the specified table.</p>
+
+<h3 class="function"><a name="is_table_migrated-2">is_table_migrated/2</a></h3>
+<div class="spec">
+<p><code>is_table_migrated(StoreId, Table) -&gt; Migrated</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Table = <a href="#type-mnesia_table">mnesia_table()</a></code></li><li><code>Migrated = boolean() | {in_progress, pid()} | undefined</code></li></ul></p>
+<p></p>
+</div><p>Returns the migration status of the specified table.</p>
+
+<h3 class="function"><a name="wait_for_table_migration-2">wait_for_table_migration/2</a></h3>
+<div class="spec">
+<p><code>wait_for_table_migration(Table, Timeout) -&gt; Ret</code>
+<ul class="definitions"><li><code>Table = <a href="#type-mnesia_table">mnesia_table()</a></code></li><li><code>Timeout = timeout()</code></li><li><code>Ret = boolean() | timeout</code></li></ul></p>
+<p></p>
+</div><p>Waits for <code>Table</code> to be migrated.</p>
+
+<h3 class="function"><a name="wait_for_table_migration-3">wait_for_table_migration/3</a></h3>
+<div class="spec">
+<p><code>wait_for_table_migration(StoreId, Table, Timeout) -&gt; Ret</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Table = <a href="#type-mnesia_table">mnesia_table()</a></code></li><li><code>Timeout = timeout()</code></li><li><code>Ret = boolean() | timeout</code></li></ul></p>
+<p></p>
+</div><p>Waits for <code>Table</code> to be migrated.</p>
+
+<h3 class="function"><a name="handle_fallback-2">handle_fallback/2</a></h3>
+<div class="spec">
+<p><code>handle_fallback(MnesiaFun, KhepriFun) -&gt; any()</code></p>
+<p></p>
+</div>
+
+<h3 class="function"><a name="handle_fallback-3">handle_fallback/3</a></h3>
+<div class="spec">
+<p><code>handle_fallback(StoreId, MnesiaFun, KhepriFun) -&gt; any()</code></p>
+<p></p>
+</div>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
