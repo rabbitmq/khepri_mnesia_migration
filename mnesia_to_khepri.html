@@ -58,6 +58,10 @@ can be used to follow an on-going copy of tables.</p>
   <a docgen-rel="seemfa" docgen-href="#handle_fallback/3" href="#handle_fallback-3"><code>handle_fallback/3</code></a>.
 <h2><a name="types">Data Types</a></h2>
 
+<h3 class="typedecl"><a name="type-error">error()</a></h3>
+<p><code>error() = {error, any()}</code></p>
+<p>  The error tuple returned by a function after a failure.</p>
+
 <h3 class="typedecl"><a name="type-mnesia_table">mnesia_table()</a></h3>
 <p><code>mnesia_table() = atom()</code></p>
 <p><p>  The name of a Mnesia table.</p>
@@ -91,7 +95,8 @@ migration.</td></tr>
 
 <h3 class="function"><a name="sync_cluster_membership-0">sync_cluster_membership/0</a></h3>
 <div class="spec">
-<p><code>sync_cluster_membership() -&gt; ok</code><br></p>
+<p><code>sync_cluster_membership() -&gt; Ret</code>
+<ul class="definitions"><li><code>Ret = ok | <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-error">mnesia_to_khepri:error()</a></code></li></ul></p>
 <p></p>
 </div><p>Ensures the default Khepri store has the same members as the Mnesia
   cluster.
@@ -100,8 +105,8 @@ migration.</td></tr>
 
 <h3 class="function"><a name="sync_cluster_membership-1">sync_cluster_membership/1</a></h3>
 <div class="spec">
-<p><code>sync_cluster_membership(StoreId) -&gt; ok</code>
-<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li></ul></p>
+<p><code>sync_cluster_membership(StoreId) -&gt; Ret</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Ret = ok | <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-error">mnesia_to_khepri:error()</a></code></li></ul></p>
 <p></p>
 </div><p><p>Ensures the Khepri store named <code>StoreId</code> has the same members as the  
 Mnesia cluster.</p>
@@ -155,8 +160,8 @@ equal, the next criterion is evaluated until one criterion gives an instance
 
 <h3 class="function"><a name="copy_tables-2">copy_tables/2</a></h3>
 <div class="spec">
-<p><code>copy_tables(Tables, Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
+<p><code>copy_tables(Tables, Mod) -&gt; Ret</code>
+<ul class="definitions"><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li><li><code>Ret = ok | <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-error">mnesia_to_khepri:error()</a></code></li></ul></p>
 <p></p>
 </div><p>Copies records from Mnesia tables <code>Tables</code> to the default Khepri
   store.
@@ -165,8 +170,8 @@ equal, the next criterion is evaluated until one criterion gives an instance
 
 <h3 class="function"><a name="copy_tables-3">copy_tables/3</a></h3>
 <div class="spec">
-<p><code>copy_tables(StoreId, Tables, Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
+<p><code>copy_tables(StoreId, Tables, Mod) -&gt; Ret</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Tables = [<a href="#type-mnesia_table">mnesia_table()</a>]</code></li><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li><li><code>Ret = ok | <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-error">mnesia_to_khepri:error()</a></code></li></ul></p>
 <p></p>
 </div><p><p>Copies records from Mnesia tables <code>Tables</code> to the Khepri store named
   <code>StoreId</code>.</p>
@@ -202,8 +207,8 @@ module or as an example to write a new one.</p>
 
 <h3 class="function"><a name="copy_all_tables-1">copy_all_tables/1</a></h3>
 <div class="spec">
-<p><code>copy_all_tables(Mod) -&gt; ok</code>
-<ul class="definitions"><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li></ul></p>
+<p><code>copy_all_tables(Mod) -&gt; Ret</code>
+<ul class="definitions"><li><code>Mod = module() | {module(), ModArgs}</code></li><li><code>ModArgs = any()</code></li><li><code>Ret = ok | <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-error">mnesia_to_khepri:error()</a></code></li></ul></p>
 <p></p>
 </div><p>Copies records from all Mnesia tables to the default Khepri store.
  </p>
