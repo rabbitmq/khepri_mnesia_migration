@@ -121,15 +121,15 @@ Mnesia cluster.</p>
   </ol>
  
   <p>The synchronization process has to select a store instance that will grow  
-and other store instances that will be reset. The criterias below are  
+and other store instances that will be reset. The criteria below are  
 evaluated to sort the list of store instances, then the first instance in  
 that list is selected as the winning instance.</p>
  
-  <p>Criterias are evaluated in order. For a given criteria, if both sides are  
-equal, the next criteria is evaluated until one criteria gives an instance  
+  <p>Criteria are evaluated in order. For a given criterion, if both sides are  
+equal, the next criterion is evaluated until one criterion gives an instance  
 "greater" than another.</p>
  
-  Here is the ordered list of criterias:
+  Here is the ordered list of criteria:
   <ol>
   <li>A Khepri store instance with more members gets precedence.</li>
   <li>Then, a Khepri store instance with more tree nodes (more records) gets
