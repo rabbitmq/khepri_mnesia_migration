@@ -33,3 +33,9 @@ body > h2.indextitle:first-of-type
 {
     display: none;
 }
+
+.markdown-body ul,
+.markdown-body ol
+{
+    margin-top: .25em;
+}
