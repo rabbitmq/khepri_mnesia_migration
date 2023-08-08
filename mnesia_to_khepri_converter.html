@@ -30,7 +30,7 @@
 <h3 class="function"><a name="init_copy_to_khepri-2">init_copy_to_khepri/2</a></h3>
 <div class="spec">
 <p><code>init_copy_to_khepri(Tables, StoreId) -&gt; Ret</code>
-<ul class="definitions"><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Ret = {ok, priv}</code></li></ul></p>
+<ul class="definitions"><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Ret = {ok, Priv}</code></li><li><code>Priv = priv</code></li></ul></p>
 <p></p>
 </div><p><p>Initializes the state of the callback module.</p>
  
@@ -53,7 +53,7 @@ callback module.</p>
 <h3 class="function"><a name="init_copy_to_khepri-3">init_copy_to_khepri/3</a></h3>
 <div class="spec">
 <p><code>init_copy_to_khepri(Tables, StoreId, Args) -&gt; Ret</code>
-<ul class="definitions"><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Args = any()</code></li><li><code>Ret = {ok, priv}</code></li></ul></p>
+<ul class="definitions"><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Args = any()</code></li><li><code>Ret = {ok, Priv}</code></li><li><code>Priv = priv</code></li></ul></p>
 <p></p>
 </div><p><p>Initializes the state of the callback module, using <code>Args</code>.</p>
  
@@ -75,7 +75,7 @@ the callback module.</p>
 <h3 class="function"><a name="copy_to_khepri-3">copy_to_khepri/3</a></h3>
 <div class="spec">
 <p><code>copy_to_khepri(Table, Record, Priv) -&gt; Ret</code>
-<ul class="definitions"><li><code>Table = <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a></code></li><li><code>Record = tuple()</code></li><li><code>Priv = priv</code></li><li><code>Ret = {ok, priv}</code></li></ul></p>
+<ul class="definitions"><li><code>Table = <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a></code></li><li><code>Record = tuple()</code></li><li><code>Priv = priv</code></li><li><code>Ret = {ok, Priv}</code></li></ul></p>
 <p></p>
 </div><p><p>Copies a record to a Khepri store.</p>
  
@@ -89,7 +89,7 @@ copy.</p>
 <h3 class="function"><a name="delete_from_khepri-3">delete_from_khepri/3</a></h3>
 <div class="spec">
 <p><code>delete_from_khepri(Table, Key, Priv) -&gt; Ret</code>
-<ul class="definitions"><li><code>Table = <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a></code></li><li><code>Key = any()</code></li><li><code>Priv = priv</code></li><li><code>Ret = {ok, priv}</code></li></ul></p>
+<ul class="definitions"><li><code>Table = <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a></code></li><li><code>Key = any()</code></li><li><code>Priv = priv</code></li><li><code>Ret = {ok, Priv}</code></li></ul></p>
 <p></p>
 </div><p><p>Deletes a key from a Khepri store.</p>
  
