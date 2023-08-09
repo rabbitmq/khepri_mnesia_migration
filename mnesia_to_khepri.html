@@ -81,10 +81,10 @@ Mnesia cluster.</td></tr>
 <tr><td valign="top"><a href="#is_table_migrated-2">is_table_migrated/2</a></td><td>Returns the migration status of the specified table.</td></tr>
 <tr><td valign="top"><a href="#wait_for_table_migration-2">wait_for_table_migration/2</a></td><td>Waits for <code>Table</code> to be migrated.</td></tr>
 <tr><td valign="top"><a href="#wait_for_table_migration-3">wait_for_table_migration/3</a></td><td>Waits for <code>Table</code> to be migrated.</td></tr>
-<tr><td valign="top"><a href="#handle_fallback-2">handle_fallback/2</a></td><td>Runs <code>MnesiaFun</code> or <code>KhepriFun</code> depending on the status of the  
-migration.</td></tr>
-<tr><td valign="top"><a href="#handle_fallback-3">handle_fallback/3</a></td><td>Runs <code>MnesiaFun</code> or <code>KhepriFun</code> depending on the status of the  
-migration.</td></tr>
+<tr><td valign="top"><a href="#handle_fallback-2">handle_fallback/2</a></td><td>Runs <code>MnesiaFun</code> or evaluates <code>KhepriFunOrRet</code> depending on the status  
+of the migration.</td></tr>
+<tr><td valign="top"><a href="#handle_fallback-3">handle_fallback/3</a></td><td>Runs <code>MnesiaFun</code> or evaluates <code>KhepriFunOrRet</code> depending on the status  
+of the migration.</td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
@@ -281,11 +281,11 @@ module or as an example to write a new one.</p>
 
 <h3 class="function"><a name="handle_fallback-2">handle_fallback/2</a></h3>
 <div class="spec">
-<p><code>handle_fallback(MnesiaFun, KhepriFun) -&gt; Ret</code>
-<ul class="definitions"><li><code>MnesiaFun = fun(() -&gt; Ret)</code></li><li><code>KhepriFun = fun(() -&gt; Ret)</code></li><li><code>Ret = any()</code></li></ul></p>
+<p><code>handle_fallback(MnesiaFun, KhepriFunOrRet) -&gt; Ret</code>
+<ul class="definitions"><li><code>MnesiaFun = fun(() -&gt; Ret)</code></li><li><code>KhepriFunOrRet = fun(() -&gt; Ret) | Ret</code></li><li><code>Ret = any()</code></li></ul></p>
 <p></p>
-</div><p><p>Runs <code>MnesiaFun</code> or <code>KhepriFun</code> depending on the status of the  
-migration.</p>
+</div><p><p>Runs <code>MnesiaFun</code> or evaluates <code>KhepriFunOrRet</code> depending on the status  
+of the migration.</p>
  
   The default Khepri store is queried to get the migration status. It must
   correspond to the Khepri store passed to <a docgen-rel="seemfa" docgen-href="#copy_tables/2" href="#copy_tables-2"><code>copy_tables/2</code></a> and similar
@@ -295,15 +295,16 @@ migration.</p>
 
 <h3 class="function"><a name="handle_fallback-3">handle_fallback/3</a></h3>
 <div class="spec">
-<p><code>handle_fallback(StoreId, MnesiaFun, KhepriFun) -&gt; Ret</code>
-<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>MnesiaFun = fun(() -&gt; Ret)</code></li><li><code>KhepriFun = fun(() -&gt; Ret)</code></li><li><code>Ret = any()</code></li></ul></p>
+<p><code>handle_fallback(StoreId, MnesiaFun, KhepriFunOrRet) -&gt; Ret</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>MnesiaFun = fun(() -&gt; Ret)</code></li><li><code>KhepriFunOrRet = fun(() -&gt; Ret) | Ret</code></li><li><code>Ret = any()</code></li></ul></p>
 <p></p>
-</div><p><p>Runs <code>MnesiaFun</code> or <code>KhepriFun</code> depending on the status of the  
-migration.</p>
+</div><p><p>Runs <code>MnesiaFun</code> or evaluates <code>KhepriFunOrRet</code> depending on the status  
+of the migration.</p>
  
   <p>The function always tries to execute <code>MnesiaFun</code> first. It should fail by
   returning or raising <code>{aborted, {no_exists, Table}}</code>. When this happens, the
-  function waits for the migration to finish using <a docgen-rel="seemfa" docgen-href="#wait_for_table_migration/3" href="#wait_for_table_migration-3"><code>wait_for_table_migration/3</code></a>, then it executes <code>KhepriFun</code>.</p>
+  function waits for the migration to finish using <a docgen-rel="seemfa" docgen-href="#wait_for_table_migration/3" href="#wait_for_table_migration-3"><code>wait_for_table_migration/3</code></a>, then it executes <code>KhepriFunOrRet</code> if it is a  
+function with arity 0 or returns the term otherwise.</p>
  
   The Khepri store named <code>StoreId</code> is queried to get the migration status. It
   must correspond to the Khepri store passed to <a docgen-rel="seemfa" docgen-href="#copy_tables/2" href="#copy_tables-2"><code>copy_tables/2</code></a> and
