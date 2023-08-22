@@ -12,14 +12,14 @@
 <hr>
 
 <h1>Module mnesia_to_khepri_converter</h1>
-<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>Behavior defining callback modules used during Mnesia-&gt;Khepri copy.
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>Behavior defining converter modules used during Mnesia-&gt;Khepri copy.
 
-<p><b>This module defines the <code>mnesia_to_khepri_converter</code> behaviour.</b><br> Required callback functions: <code>copy_to_khepri/3</code>, <code>delete_from_khepri/3</code>.<br> Optional callback functions: <code>init_copy_to_khepri/2</code>, <code>init_copy_to_khepri/3</code>, <code>finish_copy_to_khepri/1</code>.</p>
+<p><b>This module defines the <code>mnesia_to_khepri_converter</code> behaviour.</b><br> Required callback functions: <code>copy_to_khepri/3</code>, <code>delete_from_khepri/3</code>.<br> Optional callback functions: <code>init_copy_to_khepri/3</code>, <code>init_copy_to_khepri/4</code>, <code>finish_copy_to_khepri/1</code>.</p>
 
-<h2><a name="description">Description</a></h2>Behavior defining callback modules used during Mnesia-&gt;Khepri copy.
+<h2><a name="description">Description</a></h2>Behavior defining converter modules used during Mnesia-&gt;Khepri copy.
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#init_copy_to_khepri-2">init_copy_to_khepri/2</a></td><td>Initializes the state of the callback module.</td></tr>
-<tr><td valign="top"><a href="#init_copy_to_khepri-3">init_copy_to_khepri/3</a></td><td>Initializes the state of the callback module, using <code>Args</code>.</td></tr>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#init_copy_to_khepri-3">init_copy_to_khepri/3</a></td><td>Initializes the state of the converter module.</td></tr>
+<tr><td valign="top"><a href="#init_copy_to_khepri-4">init_copy_to_khepri/4</a></td><td>Initializes the state of the converter module, using <code>Args</code>.</td></tr>
 <tr><td valign="top"><a href="#copy_to_khepri-3">copy_to_khepri/3</a></td><td>Copies a record to a Khepri store.</td></tr>
 <tr><td valign="top"><a href="#delete_from_khepri-3">delete_from_khepri/3</a></td><td>Deletes a key from a Khepri store.</td></tr>
 <tr><td valign="top"><a href="#finish_copy_to_khepri-1">finish_copy_to_khepri/1</a></td><td>Performs any post-copy operations.</td></tr>
@@ -27,50 +27,56 @@
 
 <h2><a name="functions">Function Details</a></h2>
 
-<h3 class="function"><a name="init_copy_to_khepri-2">init_copy_to_khepri/2</a></h3>
+<h3 class="function"><a name="init_copy_to_khepri-3">init_copy_to_khepri/3</a></h3>
 <div class="spec">
-<p><code>init_copy_to_khepri(Tables, StoreId) -&gt; Ret</code>
-<ul class="definitions"><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Ret = {ok, Priv}</code></li><li><code>Priv = priv</code></li></ul></p>
+<p><code>init_copy_to_khepri(StoreId, MigrationId, Tables) -&gt; Ret</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>MigrationId = <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-migration_id">mnesia_to_khepri:migration_id()</a></code></li><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>Ret = {ok, Priv}</code></li><li><code>Priv = priv</code></li></ul></p>
 <p></p>
-</div><p><p>Initializes the state of the callback module.</p>
+</div><p><p>Initializes the state of the converter module.</p>
  
-  This is callback is used when a table copy is initiated like this:
-  <pre><code>mnesia_to_khepri:copy_all_tables(StoreId, my_callback_mod).</code></pre>
+  This callback is used when a table copy is initiated like this:
+  <pre><code>mnesia_to_khepri:copy_all_tables(
+  StoreId,
+  &lt;&lt;"my_migration"&gt;&gt;,
+  my_converter_mod).</code></pre>
  
-  <p>See <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> if you want to pass arguments to the  
-callback module.</p>
+  <p>See <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/4" href="#init_copy_to_khepri-4"><code>init_copy_to_khepri/4</code></a> if you want to pass arguments to the  
+converter module.</p>
  
   <p>It it called after involved tables were marked as "being migrated" (i.e.
   copy in progress). This state is recorded in the destination Khepri store
   <code>StoreId</code>.</p>
  
-  Unlike what the "optional callback functionss" line says above, at least
+  Unlike what the "optional callback functions" line says above, at least
   one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/2" href="#init_copy_to_khepri-2"><code>init_copy_to_khepri/2</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> is
   required, depending on how the copy is started.
  </p>
 <p><b>See also:</b> <a href="#init_copy_to_khepri-3">init_copy_to_khepri/3</a>.</p>
 
-<h3 class="function"><a name="init_copy_to_khepri-3">init_copy_to_khepri/3</a></h3>
+<h3 class="function"><a name="init_copy_to_khepri-4">init_copy_to_khepri/4</a></h3>
 <div class="spec">
-<p><code>init_copy_to_khepri(Tables, StoreId, Args) -&gt; Ret</code>
-<ul class="definitions"><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>Args = any()</code></li><li><code>Ret = {ok, Priv}</code></li><li><code>Priv = priv</code></li></ul></p>
+<p><code>init_copy_to_khepri(StoreId, MigrationId, Tables, Args) -&gt; Ret</code>
+<ul class="definitions"><li><code>StoreId = <a href="/home/runner/work/khepri_mnesia_migration/khepri/doc/khepri.html#type-store_id">khepri:store_id()</a></code></li><li><code>MigrationId = <a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-migration_id">mnesia_to_khepri:migration_id()</a></code></li><li><code>Tables = [<a href="/home/runner/work/khepri_mnesia_migration/khepri_mnesia_migration/doc/mnesia_to_khepri.html#type-mnesia_table">mnesia_to_khepri:mnesia_table()</a>]</code></li><li><code>Args = any()</code></li><li><code>Ret = {ok, Priv}</code></li><li><code>Priv = priv</code></li></ul></p>
 <p></p>
-</div><p><p>Initializes the state of the callback module, using <code>Args</code>.</p>
+</div><p><p>Initializes the state of the converter module, using <code>Args</code>.</p>
  
-  This is callback is used when a table copy is initiated like this:
-  <pre><code>mnesia_to_khepri:copy_all_tables(StoreId, {my_callback_mod, Args}).</code></pre>
+  This callback is used when a table copy is initiated like this:
+  <pre><code>mnesia_to_khepri:copy_all_tables(
+  StoreId,
+  &lt;&lt;"my_migration"&gt;&gt;,
+  {my_converter_mod, Args}).</code></pre>
  
-  <p>See <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/2" href="#init_copy_to_khepri-2"><code>init_copy_to_khepri/2</code></a> if you don't need to pass arguments to  
-the callback module.</p>
+  <p>See <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> if you don't need to pass arguments to  
+the converter module.</p>
  
   <p>It it called after involved tables were marked as being migrated. This
   state is recorded in the destination Khepri store <code>StoreId</code>.</p>
  
-  Unlike what the "optional callback functionss" line says above, at least
-  one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/2" href="#init_copy_to_khepri-2"><code>init_copy_to_khepri/2</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> is
+  Unlike what the "optional callback functions line says above, at least
+  one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/4" href="#init_copy_to_khepri-4"><code>init_copy_to_khepri/4</code></a> is
   required, depending on how the copy is started.
  </p>
-<p><b>See also:</b> <a href="#init_copy_to_khepri-2">init_copy_to_khepri/2</a>.</p>
+<p><b>See also:</b> <a href="#init_copy_to_khepri-3">init_copy_to_khepri/3</a>.</p>
 
 <h3 class="function"><a name="copy_to_khepri-3">copy_to_khepri/3</a></h3>
 <div class="spec">
