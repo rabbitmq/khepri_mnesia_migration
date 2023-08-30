@@ -16,7 +16,11 @@
 
 <p><b>This module defines the <code>mnesia_to_khepri_converter</code> behaviour.</b><br> Required callback functions: <code>copy_to_khepri/3</code>, <code>delete_from_khepri/3</code>.<br> Optional callback functions: <code>init_copy_to_khepri/3</code>, <code>init_copy_to_khepri/4</code>, <code>finish_copy_to_khepri/1</code>.</p>
 
-<h2><a name="description">Description</a></h2>Behavior defining converter modules used during Mnesia-&gt;Khepri copy.
+<h2><a name="description">Description</a></h2><p>Behavior defining converter modules used during Mnesia-&gt;Khepri copy.</p>
+ 
+  Unlike what the "optional callback functions" line says above, at least
+  one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/4" href="#init_copy_to_khepri-4"><code>init_copy_to_khepri/4</code></a> is
+  required, depending on how the copy is started.
 <h2><a name="index">Function Index</a></h2>
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#init_copy_to_khepri-3">init_copy_to_khepri/3</a></td><td>Initializes the state of the converter module.</td></tr>
 <tr><td valign="top"><a href="#init_copy_to_khepri-4">init_copy_to_khepri/4</a></td><td>Initializes the state of the converter module, using <code>Args</code>.</td></tr>
@@ -48,10 +52,10 @@ converter module.</p>
   <code>StoreId</code>.</p>
  
   Unlike what the "optional callback functions" line says above, at least
-  one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/2" href="#init_copy_to_khepri-2"><code>init_copy_to_khepri/2</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> is
+  one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/4" href="#init_copy_to_khepri-4"><code>init_copy_to_khepri/4</code></a> is
   required, depending on how the copy is started.
  </p>
-<p><b>See also:</b> <a href="#init_copy_to_khepri-3">init_copy_to_khepri/3</a>.</p>
+<p><b>See also:</b> <a href="#init_copy_to_khepri-4">init_copy_to_khepri/4</a>.</p>
 
 <h3 class="function"><a name="init_copy_to_khepri-4">init_copy_to_khepri/4</a></h3>
 <div class="spec">
@@ -105,8 +109,8 @@ the record that was deleted. It may not be called at all if there were no
 concurrent deletions.</p>
  
   The callback is responsible for deciding what to do in Khepri. The
-  destination Khepri store was passed to <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/2" href="#init_copy_to_khepri-2"><code>init_copy_to_khepri/2</code></a> or
-  <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a>.</p>
+  destination Khepri store was passed to <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> or
+  <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/4" href="#init_copy_to_khepri-4"><code>init_copy_to_khepri/4</code></a>.</p>
 
 <h3 class="function"><a name="finish_copy_to_khepri-1">finish_copy_to_khepri/1</a></h3>
 <div class="spec">

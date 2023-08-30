@@ -37,23 +37,23 @@ same cluster members as Mnesia.</p>
  
   <h3><a name="Tables_copy">Tables copy</a></h3>
  
-  <p>For the second part, <a docgen-rel="seemfa" docgen-href="#copy_tables/3" href="#copy_tables-3"><code>copy_tables/3</code></a>, <a docgen-rel="seemfa" docgen-href="#copy_tables/4" href="#copy_tables-4"><code>copy_tables/4</code></a>, <a docgen-rel="seemfa" docgen-href="#copy_all_tables/1" href="#copy_all_tables-1"><code>copy_all_tables/1</code></a> and <a docgen-rel="seemfa" docgen-href="#copy_all_tables/2" href="#copy_all_tables-2"><code>copy_all_tables/2</code></a> take care of copying  
+  <p>For the second part, <a docgen-rel="seemfa" docgen-href="#copy_tables/3" href="#copy_tables-3"><code>copy_tables/3</code></a>, <a docgen-rel="seemfa" docgen-href="#copy_tables/4" href="#copy_tables-4"><code>copy_tables/4</code></a>, <a docgen-rel="seemfa" docgen-href="#copy_all_tables/2" href="#copy_all_tables-2"><code>copy_all_tables/2</code></a> and <a docgen-rel="seemfa" docgen-href="#copy_all_tables/3" href="#copy_all_tables-3"><code>copy_all_tables/3</code></a> take care of copying  
 records to the designated Khepri store.</p>
  
   <p>The functions take a converter module which is responsible for actually
-  writing the given table name and record to wherever it wants in the Khepri
-  store. This allows the caller to filter and convert the records. The
-  converter module interface is defined by the <a docgen-rel="seeerl" docgen-href="mnesia_to_khepri_converter" href="mnesia_to_khepri_converter.html"><code>mnesia_to_khepri_converter</code></a> behavior. There is an example converter module
-  called <a docgen-rel="seeerl" docgen-href="mnesia_to_khepri_example_converter" href="mnesia_to_khepri_example_converter.html"><code>mnesia_to_khepri_example_converter</code></a> provided.</p>
+  writing each record to wherever it wants in the Khepri store. This allows
+  the caller to filter and convert the records. The converter module
+  interface is defined by the <a docgen-rel="seeerl" docgen-href="mnesia_to_khepri_converter" href="mnesia_to_khepri_converter.html"><code>mnesia_to_khepri_converter</code></a> behavior.
+  There is an example converter module called <a docgen-rel="seeerl" docgen-href="mnesia_to_khepri_example_converter" href="mnesia_to_khepri_example_converter.html"><code>mnesia_to_khepri_example_converter</code></a> provided.</p>
  
   <p>The copy works while Mnesia tables are still being used and updated. To
   allow that, the copy follows several stages which are explained in <a docgen-rel="seemfa" docgen-href="#copy_tables/4" href="#copy_tables-4"><code>copy_tables/4</code></a>.</p>
  
-  <p>The functions <a docgen-rel="seemfa" docgen-href="#is_migration_finished/1" href="#is_migration_finished-1"><code>is_migration_finished/1</code></a>, <a docgen-rel="seemfa" docgen-href="#is_migration_finished/2" href="#is_migration_finished-2"><code>is_migration_finished/2</code></a>, <a docgen-rel="seemfa" docgen-href="#wait_for_migration/2" href="#wait_for_migration-2"><code>wait_for_migration/2</code></a> and <a docgen-rel="seemfa" docgen-href="#wait_for_migration/3" href="#wait_for_migration-3"><code>wait_for_migration/3</code></a> can be used to follow an on-going copy of tables.</p>
+  <p>The functions <a docgen-rel="seemfa" docgen-href="#is_migration_finished/1" href="#is_migration_finished-1"><code>is_migration_finished/1</code></a>, <a docgen-rel="seemfa" docgen-href="#is_migration_finished/2" href="#is_migration_finished-2"><code>is_migration_finished/2</code></a>, <a docgen-rel="seemfa" docgen-href="#wait_for_migration/2" href="#wait_for_migration-2"><code>wait_for_migration/2</code></a> and <a docgen-rel="seemfa" docgen-href="#wait_for_migration/3" href="#wait_for_migration-3"><code>wait_for_migration/3</code></a> can be used to follow an on-going copy of the tables.</p>
  
   Finally to help with the use of the Mnesia tables and Khepri store
-  concurrently with a tables copy, you can use <a docgen-rel="seemfa" docgen-href="#handle_fallback/2" href="#handle_fallback-2"><code>handle_fallback/2</code></a> and
-  <a docgen-rel="seemfa" docgen-href="#handle_fallback/3" href="#handle_fallback-3"><code>handle_fallback/3</code></a>.
+  concurrently with a tables copy, you can use <a docgen-rel="seemfa" docgen-href="#handle_fallback/3" href="#handle_fallback-3"><code>handle_fallback/3</code></a> and
+  <a docgen-rel="seemfa" docgen-href="#handle_fallback/4" href="#handle_fallback-4"><code>handle_fallback/4</code></a>.
 <h2><a name="types">Data Types</a></h2>
 
 <h3 class="typedecl"><a name="type-converter_mod">converter_mod()</a></h3>
