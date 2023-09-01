@@ -7,9 +7,7 @@
   {mod, {khepri_mnesia_migration_app, []}},
   {applications,
    [kernel,
-    stdlib,
-    mnesia,
-    khepri
+    stdlib
    ]},
   {env,[]},
   {files, [
