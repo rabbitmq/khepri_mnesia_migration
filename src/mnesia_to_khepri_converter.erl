@@ -7,6 +7,9 @@
 
 %% @doc Behavior defining converter modules used during Mnesia->Khepri copy.
 %%
+%% All callbacks are run in the same process, so process-based features like
+%% the dictionary and mailbox are usable from the callback functions.
+%%
 %% Unlike what the "optional callback functions" line says above, at least
 %% one of {@link init_copy_to_khepri/3} or {@link init_copy_to_khepri/4} is
 %% required, depending on how the copy is started.

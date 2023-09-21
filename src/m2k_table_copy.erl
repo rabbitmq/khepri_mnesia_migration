@@ -44,6 +44,7 @@
                                    {mnesia_to_khepri:converter_mod(), any()},
                   converter_mod_priv :: any() | undefined,
                   subscriber :: pid() | undefined,
+                  backup_pid :: pid() | undefined,
                   progress :: #migration{}}).
 
 proceed(SupPid) ->
@@ -149,7 +150,7 @@ rollback(StoreId, MigrationId) ->
     case khepri:get(StoreId, Path) of
         {ok, #migration{progress = finished,
                         tables = Tables} = Progress} ->
-            m2k_subscriber:make_tables_readwrite(Tables),
+            make_tables_readwrite(Tables),
             clear_migration_marker(StoreId, MigrationId, Progress),
             ok;
         {ok, #migration{progress = InFlight}} ->
@@ -251,11 +252,12 @@ do_copy_data(#?MODULE{migration_id = MigrationId, tables = Tables} = State) ->
 
     State1 = init_converter_mod(State),
     subscribe_to_mnesia_changes(State1),
-    State2 = copy_from_mnesia_to_khepri(State1),
-    State3 = final_sync_from_mnesia_to_khepri(State2),
-    State4 = finish_converter_mod(State3),
+    State2 = start_copy_from_mnesia_to_khepri(State1),
+    State3 = handle_migration_records(State2),
+    State4 = final_sync_from_mnesia_to_khepri(State3),
+    State5 = finish_converter_mod(State4),
 
-    mark_tables_as_migrated(State4),
+    mark_tables_as_migrated(State5),
 
     ?LOG_INFO(
        "Mnesia->Khepri data copy: "
@@ -263,7 +265,7 @@ do_copy_data(#?MODULE{migration_id = MigrationId, tables = Tables} = State) ->
        [MigrationId],
        #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
 
-    State4.
+    State5.
 
 init_converter_mod(
   #?MODULE{tables = Tables,
@@ -322,11 +324,7 @@ subscribe_to_mnesia_changes(
                    error => Error}))
     end.
 
-copy_from_mnesia_to_khepri(
-  #?MODULE{khepri_store = StoreId,
-           tables = Tables,
-           converter_mod = Mod,
-           converter_mod_priv = ModPriv} = State) ->
+start_copy_from_mnesia_to_khepri(#?MODULE{tables = Tables} = State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: start actual data copy",
        #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
@@ -334,34 +332,18 @@ copy_from_mnesia_to_khepri(
                          {ram_overrides_dump, true}],
     case mnesia:activate_checkpoint(CheckpointOptions) of
         {ok, Checkpoint, _Nodes} ->
-            ActualMod = actual_mod(Mod),
-            Args = #{khepri_store => StoreId,
-                     converter_mod => ActualMod,
-                     converter_mod_priv => ModPriv,
-                     table_copy_pid => self()},
-            Ret = mnesia:backup_checkpoint(Checkpoint, Args, m2k_export),
-            _ = mnesia:deactivate_checkpoint(Checkpoint),
-            ModPriv1 = receive
-                           {m2k_export, MP} -> MP
-                       after 0 ->
-                                 ModPriv
-                       end,
-            case Ret of
-                ok ->
-                    State#?MODULE{converter_mod_priv = ModPriv1};
-                {error, {'EXIT', {error, {error, {_, {error, Reason}}}}}} ->
-                    ?kmm_misuse(
-                       converter_mod_exception,
-                       #{converter_mod => Mod,
-                         tables => Tables,
-                         reason => Reason});
-                Error ->
-                    throw(
-                      ?kmm_error(
-                         converter_mod_error,
-                         #{converter_mod => Mod,
-                           error => Error}))
-            end;
+            Self = self(),
+            Args = #{table_copy_pid => Self},
+            BackupPid = spawn_link(
+                          fun() ->
+                                  Ret = mnesia:backup_checkpoint(
+                                          Checkpoint, Args, m2k_export),
+                                  _ = mnesia:deactivate_checkpoint(Checkpoint),
+                                  Self ! {self(), done, Ret},
+                                  unlink(Self),
+                                  exit(normal)
+                          end),
+            State#?MODULE{backup_pid = BackupPid};
         Error ->
             throw(
               ?kmm_error(
@@ -370,22 +352,89 @@ copy_from_mnesia_to_khepri(
                    error => Error}))
     end.
 
-final_sync_from_mnesia_to_khepri(
-  #?MODULE{subscriber = SubscriberPid,
+handle_migration_records(
+  #?MODULE{backup_pid = BackupPid,
            converter_mod = Mod,
-           converter_mod_priv = ModPriv} = State) ->
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: final sync",
-       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
-    case m2k_subscriber:flush(SubscriberPid, ModPriv) of
-        {ok, ModPriv1} ->
-            State#?MODULE{converter_mod_priv = ModPriv1};
-        Error ->
+           converter_mod_priv = ModPriv,
+           tables = Tables} = State0) ->
+    receive
+        {m2k_export, ExportPid, handle_record, Table, Record} ->
+            {State, Reply} = try
+                                 ActualMod = actual_mod(Mod),
+                                 case ActualMod:copy_to_khepri(
+                                        Table, Record, ModPriv) of
+                                     {ok, ModPriv1} ->
+                                         State1 = State0#?MODULE{
+                                                    converter_mod_priv =
+                                                    ModPriv1},
+                                         {State1, ok};
+                                     Error ->
+                                         {State0, Error}
+                                 end
+                             catch
+                                 Class:Reason:Stacktrace ->
+                                     Exception = ?kmm_exception(
+                                                   converter_mod_exception,
+                                                   #{converter_mod => Mod,
+                                                     tables => Tables,
+                                                     class => Class,
+                                                     reason => Reason,
+                                                     stacktrace =>
+                                                     Stacktrace}),
+                                     {State0, {error, Exception}}
+                             end,
+            ExportPid ! {self(), record_handled, Reply},
+            handle_migration_records(State);
+        {BackupPid, done, Ret} ->
+            case Ret of
+                ok ->
+                    State0;
+                {error,
+                 {'EXIT',
+                  {error,
+                   {error,
+                    {_, {error, ?kmm_exception(_, _) = Exception}}}}}} ->
+                    ?kmm_misuse(Exception);
+                Error ->
+                    throw(
+                      ?kmm_error(
+                         converter_mod_error,
+                         #{converter_mod => Mod,
+                           error => Error}))
+            end;
+        {'EXIT', BackupPid, Reason} ->
+            throw(
+              ?kmm_error(
+                 backup_process_error,
+                 #{converter_mod => Mod,
+                   error => Reason}))
+    after
+        15_000 ->
             throw(
               ?kmm_error(
                  converter_mod_error,
                  #{converter_mod => Mod,
-                   error => Error}))
+                   error => timeout}))
+    end.
+
+final_sync_from_mnesia_to_khepri(
+  #?MODULE{tables = Tables,
+           subscriber = SubscriberPid} = State) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: final sync",
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+    %% Switch all tables to read-only. All concurrent and future Mnesia
+    %% transactions involving a write to one of them will fail with the
+    %% `{no_exists, Table}' exception.
+    make_tables_readonly(Tables),
+
+    try
+        Events = m2k_subscriber:drain(SubscriberPid),
+        consume_mnesia_events(Events, State)
+    catch
+        Class:Reason:Stacktrace ->
+            make_tables_readwrite(Tables),
+            erlang:raise(Class, Reason, Stacktrace)
     end.
 
 finish_converter_mod(
@@ -400,7 +449,7 @@ finish_converter_mod(
                 State#?MODULE{converter_mod_priv = undefined}
             catch
                 Class:Reason:Stacktrace ->
-                    m2k_subscriber:make_tables_readwrite(Tables),
+                    make_tables_readwrite(Tables),
                     ?kmm_misuse(
                        converter_mod_exception,
                        #{converter_mod => Mod,
@@ -482,3 +531,84 @@ migration_recorded_state(Pid, Tables) when is_pid(Pid) ->
 
 marker_path(PathComponent) ->
     ['__khepri_mnesia_migration', ?MODULE, PathComponent].
+
+make_tables_readonly(Tables) ->
+    make_tables_readonly(Tables, []).
+
+make_tables_readonly([Table | Rest], AlreadyMarked) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: mark Mnesia table `~ts` as read-only",
+       [Table],
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+    case mnesia:change_table_access_mode(Table, read_only) of
+        {atomic, ok} ->
+            make_tables_readonly(Rest, [Table | AlreadyMarked]);
+        {aborted, {already_exists, _, read_only}} ->
+            make_tables_readonly(Rest, [Table | AlreadyMarked]);
+        {aborted, _} = Error ->
+            _ = make_tables_readwrite(AlreadyMarked),
+            throw(Error)
+    end;
+make_tables_readonly([], _AlreadyMarked) ->
+    ok.
+
+make_tables_readwrite([Table | Rest]) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: mark Mnesia table `~ts` as read-write after "
+       "a failed copy or a rollback",
+       [Table],
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+    _ = mnesia:change_table_access_mode(Table, read_write),
+    make_tables_readwrite(Rest);
+make_tables_readwrite([]) ->
+    ok.
+
+consume_mnesia_events(
+  Events,
+  #?MODULE{tables = Tables,
+           converter_mod = Mod,
+           converter_mod_priv = ModPriv} = State) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: consuming ~b Mnesia events from tables ~0p",
+       [length(Events), Tables],
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+    ActualMod = actual_mod(Mod),
+    ModPriv1 = consume_mnesia_events1(Events, ActualMod, ModPriv),
+    State#?MODULE{converter_mod_priv = ModPriv1}.
+
+consume_mnesia_events1([{put, Table, Record} | Rest], Mod, ModPriv) ->
+    case Mod:copy_to_khepri(Table, Record, ModPriv) of
+        {ok, ModPriv1} ->
+            Remaining = length(Rest),
+            if
+                Remaining rem 100 =:= 0 ->
+                    ?LOG_DEBUG(
+                       "Mnesia->Khepri data copy: ~b Mnesia events left",
+                       [Remaining],
+                       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN});
+                true ->
+                    ok
+            end,
+            consume_mnesia_events1(Rest, Mod, ModPriv1);
+        Error ->
+            throw(Error)
+    end;
+consume_mnesia_events1([{delete, Table, Key} | Rest], Mod, ModPriv) ->
+    case Mod:delete_from_khepri(Table, Key, ModPriv) of
+        {ok, ModPriv1} ->
+            Remaining = length(Rest),
+            if
+                Remaining rem 100 =:= 0 ->
+                    ?LOG_DEBUG(
+                       "Mnesia->Khepri data copy: ~b Mnesia events left",
+                       [Remaining],
+                       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN});
+                true ->
+                    ok
+            end,
+            consume_mnesia_events1(Rest, Mod, ModPriv1);
+        Error ->
+            throw(Error)
+    end;
+consume_mnesia_events1([], _Mod, ModPriv) ->
+    ModPriv.

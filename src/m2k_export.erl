@@ -19,9 +19,7 @@
          commit_write/1,
          abort_write/1]).
 
-open_write(#{converter_mod := _,
-             converter_mod_priv := _,
-             table_copy_pid := _} = Args) ->
+open_write(#{table_copy_pid := _} = Args) ->
     State = Args#{table_to_record_name => #{}},
     {ok, State}.
 
@@ -60,8 +58,7 @@ write(
     write(State1, Rest);
 write(
   #{table_to_record_name := TableToRecordName,
-    converter_mod := Mod,
-    converter_mod_priv := ModPriv} = State,
+    table_copy_pid := TableCopyPid} = State,
   [Record | Rest]) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] write: record/~0p",
@@ -72,28 +69,35 @@ write(
                   #{Table := RecordName} -> setelement(1, Record, RecordName);
                   _                      -> Record
               end,
-    case Mod:copy_to_khepri(Table, Record1, ModPriv) of
-        {ok, ModPriv1} ->
-            State1 = State#{converter_mod_priv => ModPriv1},
-            write(State1, Rest);
+    TableCopyPid ! {?MODULE, self(), handle_record, Table, Record1},
+    Result = receive
+                 {TableCopyPid, record_handled, Res} ->
+                     Res
+             after
+                 15_000 ->
+                     ?LOG_ERROR(
+                        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] timeout: record/~0p",
+                        [Record],
+                        #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+                     {error, timeout}
+             end,
+    case Result of
+        ok ->
+            write(State, Rest);
         Error ->
             Error
     end;
 write(State, []) ->
     {ok, State}.
 
-commit_write(#{converter_mod_priv := ModPriv,
-               table_copy_pid := TableCopyPid} = State) ->
+commit_write(State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] commit_write",
        #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
-    TableCopyPid ! {?MODULE, ModPriv},
     {ok, State}.
 
-abort_write(#{converter_mod_priv := ModPriv,
-              table_copy_pid := TableCopyPid} = State) ->
+abort_write(State) ->
     ?LOG_DEBUG(
        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] abort_write",
        #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
-    TableCopyPid ! {?MODULE, ModPriv},
     {ok, State}.
