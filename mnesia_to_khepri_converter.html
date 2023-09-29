@@ -18,6 +18,9 @@
 
 <h2><a name="description">Description</a></h2><p>Behavior defining converter modules used during Mnesia-&gt;Khepri copy.</p>
  
+  <p>All callbacks are run in the same process, so process-based features like  
+the dictionary and mailbox are usable from the callback functions.</p>
+ 
   Unlike what the "optional callback functions" line says above, at least
   one of <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/3" href="#init_copy_to_khepri-3"><code>init_copy_to_khepri/3</code></a> or <a docgen-rel="seemfa" docgen-href="#init_copy_to_khepri/4" href="#init_copy_to_khepri-4"><code>init_copy_to_khepri/4</code></a> is
   required, depending on how the copy is started.
