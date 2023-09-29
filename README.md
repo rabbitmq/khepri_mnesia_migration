@@ -48,7 +48,7 @@ Using Mix:
 # In mix.exs
 defp deps do
   [
-    :khepri_mnesia_migration, "0.1.1"}
+    {:khepri_mnesia_migration, "0.1.1"}
   ]
 end
 ```
