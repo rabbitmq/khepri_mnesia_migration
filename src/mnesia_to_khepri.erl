@@ -93,9 +93,6 @@
               mnesia_table/0,
               converter_mod/0]).
 
--define(MIGRATION_FINISHED_PT_KEY(StoreId, MigrationId),
-        {?MODULE, migration_finished, StoreId, MigrationId}).
-
 %% -------------------------------------------------------------------
 %% Cluster membership.
 %% -------------------------------------------------------------------
@@ -365,19 +362,7 @@ is_migration_finished(MigrationId) ->
 %% where the status is recorded failed.
 
 is_migration_finished(StoreId, MigrationId) when is_binary(MigrationId) ->
-    Key = ?MIGRATION_FINISHED_PT_KEY(StoreId, MigrationId),
-    case persistent_term:get(Key, false) of
-        true ->
-            true;
-        false ->
-            case m2k_table_copy:is_migration_finished(StoreId, MigrationId) of
-                true ->
-                    persistent_term:put(Key, true),
-                    true;
-                Migrated ->
-                    Migrated
-            end
-    end.
+    m2k_table_copy:is_migration_finished(StoreId, MigrationId).
 
 -spec wait_for_migration(MigrationId, Timeout) -> Ret when
       MigrationId :: mnesia_to_khepri:migration_id(),
@@ -483,14 +468,7 @@ rollback_table_copy(MigrationId) ->
 
 rollback_table_copy(StoreId, MigrationId)
   when is_binary(MigrationId) ->
-    case m2k_table_copy:rollback(StoreId, MigrationId) of
-        ok ->
-            Key = ?MIGRATION_FINISHED_PT_KEY(StoreId, MigrationId),
-            _ = persistent_term:erase(Key),
-            ok;
-        {error, _} = Error ->
-            Error
-    end.
+    m2k_table_copy:rollback(StoreId, MigrationId).
 
 -spec handle_fallback(MigrationId, MnesiaFun, KhepriFunOrRet) ->
     Ret when
