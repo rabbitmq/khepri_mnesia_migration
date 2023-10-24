@@ -67,6 +67,47 @@ proceed(SupPid) ->
       IsFinished :: boolean() | {in_flight, pid()} | undefined.
 
 is_migration_finished(StoreId, MigrationId) when is_binary(MigrationId) ->
+    ProjectionName = 'kmm_m2k_table_copy_projection',
+    try
+        case ets:lookup(ProjectionName, MigrationId) of
+            [{_, #migration{progress = finished}}] ->
+                true;
+            [{_, #migration{progress = {in_flight, _} = InFlight}}] ->
+                InFlight;
+            [] ->
+                false
+        end
+    catch
+        error:badarg ->
+            case setup_projection(StoreId, ProjectionName) of
+                ok ->
+                    is_migration_finished(StoreId, MigrationId);
+                Error ->
+                    ?LOG_WARNING(
+                       "Mnesia->Khepri data copy: failed to setup Khepri "
+                       "projection for migration \"~ts\", expect slower "
+                       "versions of `is_migration_finished()` and "
+                       "`handle_fallback()`~n~p",
+                       [MigrationId, Error],
+                       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+                    is_migration_finished_slow(StoreId, MigrationId)
+            end
+    end.
+
+setup_projection(StoreId, ProjectionName) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri data copy: setup Khepri projection (name: \"~s\")",
+       [ProjectionName],
+       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+    PathPattern = marker_path(?KHEPRI_WILDCARD_STAR),
+    Options = #{type => set, read_concurrency => true},
+    ProjectionFun = fun(Path, Progress) ->
+                            {lists:last(Path), Progress}
+                    end,
+    Projection = khepri_projection:new(ProjectionName, ProjectionFun, Options),
+    khepri:register_projection(StoreId, PathPattern, Projection).
+
+is_migration_finished_slow(StoreId, MigrationId) ->
     Path = marker_path(MigrationId),
     case khepri:get_or(StoreId, Path, false) of
         {ok, #migration{progress = finished}}                  -> true;
