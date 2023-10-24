@@ -4,7 +4,7 @@
 @author The RabbitMQ team <rabbitmq-core@groups.vmware.com>
 @copyright 2022-2023 VMware, Inc. or its affiliates.  All rights reserved.
 @title The Mnesia↔Khepri migration toolkit
-@version 0.1.1
+@version 0.2.0
 
 @doc
 `khepri_mnesia_migration' is a library providing helpers to migrate data
