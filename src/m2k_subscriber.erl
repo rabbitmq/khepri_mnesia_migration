@@ -53,6 +53,7 @@ handle_call({subscribe, Tables}, _From, State) ->
 handle_call(drain, _From, #?MODULE{events = Events} = State) ->
     State1 = State#?MODULE{events = []},
     State2 = do_unsubscribe(State1),
+    %% FIXME: Empty the mailbox, it could contains Mnesia events!
     {reply, lists:reverse(Events), State2};
 handle_call(Request, _From, State) ->
     ?LOG_WARNING(
