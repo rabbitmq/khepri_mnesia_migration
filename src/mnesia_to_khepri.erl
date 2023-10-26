@@ -446,7 +446,7 @@ cleanup_after_table_copy(StoreId, MigrationId)
 -spec rollback_table_copy(MigrationId) -> Ret when
       MigrationId :: mnesia_to_khepri:migration_id(),
       Ret :: ok | {error, any()}.
-%% @doc Performs any cleanups after a migration has finished.
+%% @doc Rolls back a migration.
 %%
 %% @see rollback_table_copy/2.
 
@@ -458,13 +458,12 @@ rollback_table_copy(MigrationId) ->
       StoreId :: khepri:store_id(),
       MigrationId :: mnesia_to_khepri:migration_id(),
       Ret :: ok | {error, any()}.
-%% @doc Performs any cleanups after a migration has finished.
+%% @doc Rolls back a migration.
 %%
-%% Currently this includes the deletion of the copied Mnesia tables.
+%% This function puts Mnesia tables back to read-write mode and deletes the
+%% "migration in progress" marker.
 %%
-%% This is a separate step from {@link copy_tables/4} because the caller might
-%% want to record some post-migration states before comitting to delete the
-%% Mnesia tables.
+%% Rollback is not possible once {@link cleanup_after_table_copy/2} is used.
 
 rollback_table_copy(StoreId, MigrationId)
   when is_binary(MigrationId) ->
