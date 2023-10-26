@@ -12,6 +12,7 @@
 -behaviour(gen_server).
 
 -include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("khepri/include/khepri.hrl").
 
 -include("src/kmm_error.hrl").
@@ -47,6 +48,8 @@
                   backup_pid :: pid() | undefined,
                   progress :: #migration{}}).
 
+-define(PROJECTION_NAME, kmm_m2k_table_copy_projection).
+
 proceed(SupPid) ->
     [{m2k_subscriber, SubscriberPid, _, _},
      {m2k_table_copy, TableCopyPid, _, _}] =
@@ -67,7 +70,7 @@ proceed(SupPid) ->
       IsFinished :: boolean() | {in_flight, pid()} | undefined.
 
 is_migration_finished(StoreId, MigrationId) when is_binary(MigrationId) ->
-    ProjectionName = 'kmm_m2k_table_copy_projection',
+    ProjectionName = ?PROJECTION_NAME,
     try
         case ets:lookup(ProjectionName, MigrationId) of
             [{_, #migration{progress = finished}}] ->
@@ -193,6 +196,8 @@ rollback(StoreId, MigrationId) ->
                         tables = Tables} = Progress} ->
             make_tables_readwrite(Tables),
             clear_migration_marker(StoreId, MigrationId, Progress),
+            wait_for_projected_record_deletion(MigrationId),
+            ?assertEqual(false, is_migration_finished(StoreId, MigrationId)),
             ok;
         {ok, #migration{progress = InFlight}} ->
             {error, InFlight};
@@ -200,6 +205,24 @@ rollback(StoreId, MigrationId) ->
             {error, {no_such_migration, MigrationId}};
         {error, _} = Error ->
             Error
+    end.
+
+wait_for_projected_record_deletion(MigrationId) ->
+    Retry = try
+                case ets:lookup(?PROJECTION_NAME, MigrationId) of
+                    [_] -> true;
+                    []  -> false
+                end
+            catch
+                error:badarg ->
+                    false
+            end,
+    case Retry of
+        true ->
+            timer:sleep(100),
+            wait_for_projected_record_deletion(MigrationId);
+        false ->
+            ok
     end.
 
 start_link(Args) ->
