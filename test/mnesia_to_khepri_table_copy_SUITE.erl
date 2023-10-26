@@ -589,6 +589,13 @@ is_migration_finished_works(Config) ->
     StoreId = RaSystem,
     MigrationId = store_id_to_mig_id(StoreId),
 
+    %% `is_migration_finished/2' works even if the given store is unavailable.
+    ?assertEqual(
+       false,
+       erpc:call(
+         Node1,
+         mnesia_to_khepri, is_migration_finished, [StoreId, MigrationId])),
+
     ?assertEqual(
        {ok, StoreId},
        rpc:call(Node1, khepri, start, [RaSystem, StoreId])),
