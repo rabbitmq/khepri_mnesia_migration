@@ -511,9 +511,14 @@ handle_fallback(MigrationId, MnesiaFun, KhepriFunOrRet) ->
 %% similar functions.
 
 -define(UNKNOWN_TABLE, 0).
+-define(CONSIDER_INFINITE_LOOP_AFTER, 100).
 
 handle_fallback(StoreId, MigrationId, MnesiaFun, KhepriFunOrRet)
   when is_binary(MigrationId) andalso is_function(MnesiaFun, 0) ->
+    handle_fallback(StoreId, MigrationId, MnesiaFun, KhepriFunOrRet, 1).
+
+handle_fallback(StoreId, MigrationId, MnesiaFun, KhepriFunOrRet, Attempts)
+  when Attempts < ?CONSIDER_INFINITE_LOOP_AFTER ->
     case is_migration_finished(StoreId, MigrationId) of
         true when is_function(KhepriFunOrRet, 0) ->
             KhepriFunOrRet();
@@ -531,7 +536,8 @@ handle_fallback(StoreId, MigrationId, MnesiaFun, KhepriFunOrRet)
 
                         _ = wait_for_migration(StoreId, MigrationId, 1000),
                         handle_fallback(
-                          StoreId, MigrationId, MnesiaFun, KhepriFunOrRet);
+                          StoreId, MigrationId, MnesiaFun, KhepriFunOrRet,
+                          Attempts + 1);
                     Ret ->
                         Ret
                 end
@@ -543,9 +549,17 @@ handle_fallback(StoreId, MigrationId, MnesiaFun, KhepriFunOrRet)
 
                     _ = wait_for_migration(StoreId, MigrationId, 1000),
                     handle_fallback(
-                      StoreId, MigrationId, MnesiaFun, KhepriFunOrRet)
+                      StoreId, MigrationId, MnesiaFun, KhepriFunOrRet,
+                      Attempts + 1)
             end
-    end.
+    end;
+handle_fallback(
+  _StoreId, _MigrationId, MnesiaFun, _KhepriFunOrRet, Attempts) ->
+    ?LOG_WARNING(
+       "Mnesia->Khepri fallback handling: Mnesia function failed ~b times. "
+       "Possibly an infinite retry loop; trying one last time",
+       [Attempts - 1]),
+    MnesiaFun().
 
 log_no_exists_error(NoExists, Stacktrace) ->
     case table_name_from_no_exists(NoExists) of
