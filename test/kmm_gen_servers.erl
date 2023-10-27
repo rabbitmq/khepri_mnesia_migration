@@ -22,6 +22,9 @@ m2k_subscriber_test() ->
     test_gen_server(Module).
 
 test_gen_server(Module) ->
+    ok = mnesia:start(),
+    {atomic, ok} = mnesia:create_table(Module, []),
+
     RaSystem = Module,
     StoreId = RaSystem,
     StoreDir = helpers:store_dir_name(RaSystem),
