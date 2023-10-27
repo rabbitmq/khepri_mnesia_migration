@@ -521,38 +521,52 @@ handle_fallback(StoreId, MigrationId, MnesiaFun, KhepriFunOrRet)
             KhepriFunOrRet;
         _ ->
             try
-                MnesiaFun()
+                case MnesiaFun() of
+                    {aborted, NoExists1}
+                      when is_tuple(NoExists1) andalso
+                           element(1, NoExists1) =:= no_exists ->
+                        {_, Stacktrace1} = erlang:process_info(
+                                             self(), current_stacktrace),
+                        log_no_exists_error(NoExists1, Stacktrace1),
+
+                        _ = wait_for_migration(StoreId, MigrationId, 1000),
+                        handle_fallback(
+                          StoreId, MigrationId, MnesiaFun, KhepriFunOrRet);
+                    Ret ->
+                        Ret
+                end
             catch
-                _:{_aborted, NoExists}:Stacktrace
-                  when is_tuple(NoExists) andalso
-                       element(1, NoExists) =:= no_exists ->
-                    case table_name_from_no_exists(NoExists) of
-                        ?UNKNOWN_TABLE ->
-                            ?LOG_DEBUG(
-                               "Mnesia->Khepri fallback handling: "
-                               "Mnesia function failed because at least "
-                               "one table is missing or read-only. "
-                               "Migration could be in progress; waiting "
-                               "for migration to progress and trying again~n"
-                               "~p",
-                               [Stacktrace]),
-                            ok;
-                        Table ->
-                            ?LOG_DEBUG(
-                               "Mnesia->Khepri fallback handling: "
-                               "Mnesia function failed because table `~ts` "
-                               "is missing or read-only. "
-                               "Migration could be in progress; waiting "
-                               "for migration to progress and trying again~n"
-                               "~p",
-                               [Table, Stacktrace]),
-                            ok
-                    end,
+                _:{_aborted, NoExists2}:Stacktrace2
+                  when is_tuple(NoExists2) andalso
+                       element(1, NoExists2) =:= no_exists ->
+                    log_no_exists_error(NoExists2, Stacktrace2),
 
                     _ = wait_for_migration(StoreId, MigrationId, 1000),
                     handle_fallback(
                       StoreId, MigrationId, MnesiaFun, KhepriFunOrRet)
             end
+    end.
+
+log_no_exists_error(NoExists, Stacktrace) ->
+    case table_name_from_no_exists(NoExists) of
+        ?UNKNOWN_TABLE ->
+            ?LOG_DEBUG(
+               "Mnesia->Khepri fallback handling: Mnesia function failed "
+               "because at least one table is missing or read-only. "
+               "Migration could be in progress; waiting for migration to "
+               "progress and trying again~n"
+               "~p",
+               [Stacktrace]),
+            ok;
+        Table ->
+            ?LOG_DEBUG(
+               "Mnesia->Khepri fallback handling: Mnesia function failed "
+               "because table `~ts` is missing or read-only. Migration "
+               "could be in progress; waiting for migration to progress "
+               "and trying again~n"
+               "~p",
+               [Table, Stacktrace]),
+            ok
     end.
 
 table_name_from_no_exists({no_exists, Table}) when is_atom(Table) ->
