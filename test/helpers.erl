@@ -122,7 +122,7 @@ mnesia_cluster_members(Node) ->
     lists:sort(Nodes).
 
 khepri_cluster_members(Node, StoreId) ->
-    Nodes = rpc:call(Node, khepri_cluster, nodes, [StoreId]),
+    {ok, Nodes} = rpc:call(Node, khepri_cluster, nodes, [StoreId]),
     lists:sort(Nodes).
 
 -define(LOGFMT_CONFIG, #{legacy_header => false,

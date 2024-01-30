@@ -164,15 +164,15 @@ list_all_khepri_clusters(Nodes, StoreId) ->
 
 khepri_cluster_on_node(Node, StoreId) ->
     case rpc:call(Node, khepri_cluster, nodes, [StoreId]) of
-        AllNodes when is_list(AllNodes) andalso AllNodes =/= [] ->
+        {ok, AllNodes} when is_list(AllNodes) andalso AllNodes =/= [] ->
             SortedNodes = lists:sort(AllNodes),
             SortedNodes;
-        [] ->
+        {error, noproc} ->
             ?kmm_misuse(
                khepri_store_must_run,
                #{node => Node,
                  store_id => StoreId});
-        Error ->
+        {error, _Reason} = Error ->
             throw(
               ?kmm_error(
                  failed_to_query_khepri_nodes,
