@@ -95,6 +95,14 @@ is_migration_finished1(StoreId, MigrationId) ->
             case setup_projection(StoreId, ProjectionName) of
                 ok ->
                     is_migration_finished1(StoreId, MigrationId);
+                %% Before Khepri v0.13.0, `khepri:register_projection/1,2,3`
+                %% would return `{error, exists}` for projections which already
+                %% exist.
+                {error, exists} ->
+                    is_migration_finished1(StoreId, MigrationId);
+                %% In v0.13.0+, Khepri returns a `?khepri_error(..)` instead.
+                {error, {khepri, projection_already_exists, _Info}} ->
+                    is_migration_finished1(StoreId, MigrationId);
                 Error ->
                     ?LOG_WARNING(
                        "Mnesia->Khepri data copy: failed to setup Khepri "
