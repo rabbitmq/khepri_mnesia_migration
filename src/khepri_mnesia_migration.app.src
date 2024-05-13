@@ -1,7 +1,7 @@
 %% vim:ft=erlang:sw=2:et:
 {application, khepri_mnesia_migration,
  [{description, "Tools to migrate between Mnesia and Khepri"},
-  {vsn, "0.4.0"},
+  {vsn, "0.5.0"},
   {registered, [khepri_mnesia_migration_sup,
                 m2k_cluster_sync_sup]},
   {mod, {khepri_mnesia_migration_app, []}},

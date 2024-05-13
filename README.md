@@ -31,7 +31,7 @@ Using Rebar:
 
 ```erlang
 %% In rebar.config
-{deps, [{khepri_mnesia_migration, "0.4.0"}]}.
+{deps, [{khepri_mnesia_migration, "0.5.0"}]}.
 ```
 
 Using Erlang.mk:
@@ -39,7 +39,7 @@ Using Erlang.mk:
 ```make
 # In your Makefile
 DEPS += khepri_mnesia_migration
-dep_khepri_mnesia_migration = hex 0.4.0
+dep_khepri_mnesia_migration = hex 0.5.0
 ```
 
 Using Mix:
@@ -48,7 +48,7 @@ Using Mix:
 # In mix.exs
 defp deps do
   [
-    {:khepri_mnesia_migration, "0.4.0"}
+    {:khepri_mnesia_migration, "0.5.0"}
   ]
 end
 ```
@@ -100,7 +100,8 @@ rebar3 as test dialyzer
 
 ## Copyright and License
 
-© 2022-2024 Broadcom. All Rights Reserved. The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+© 2022-2024 Broadcom. All Rights Reserved. The term "Broadcom" refers to
+Broadcom Inc. and/or its subsidiaries.
 
 This work is dual-licensed under the Apache License 2.0 and the Mozilla Public
 License 2.0. You can choose between one of them if you use this work.
