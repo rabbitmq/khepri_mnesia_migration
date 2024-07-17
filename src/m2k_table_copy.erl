@@ -104,11 +104,11 @@ is_migration_finished1(StoreId, MigrationId) ->
                 {error, {khepri, projection_already_exists, _Info}} ->
                     is_migration_finished1(StoreId, MigrationId);
                 Error ->
-                    ?LOG_WARNING(
-                       "Mnesia->Khepri data copy: failed to setup Khepri "
-                       "projection for migration \"~ts\", expect slower "
-                       "versions of `is_migration_finished()` and "
-                       "`handle_fallback()`~n~p",
+                    ?LOG_INFO(
+                       "Mnesia/Khepri backend selection: couldn't setup Khepri "
+                       "projection for migration \"~ts\"; that's ok but expect "
+                       "slightly slower versions of `is_migration_finished()` "
+                       "and `handle_fallback()`~n~p",
                        [MigrationId, Error],
                        #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
                     is_migration_finished_slow(StoreId, MigrationId)
