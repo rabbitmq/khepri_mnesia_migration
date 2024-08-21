@@ -74,7 +74,7 @@ proceed(SupPid) ->
 is_migration_finished(StoreId, MigrationId) when is_binary(MigrationId) ->
     %% If the Khepri store is not running, we can assume that the migration
     %% didn't take place yet.
-    case is_khepri_store_running(StoreId) of
+    case khepri_cluster:is_store_running(StoreId) of
         true  -> is_migration_finished1(StoreId, MigrationId);
         false -> false
     end.
@@ -122,10 +122,6 @@ is_migration_finished1(StoreId, MigrationId) ->
                     is_migration_finished_slow(StoreId, MigrationId)
             end
     end.
-
-is_khepri_store_running(StoreId) ->
-    RunningStoreIds = khepri:get_store_ids(),
-    lists:member(StoreId, RunningStoreIds).
 
 setup_projection(StoreId, ProjectionName) ->
     ?LOG_DEBUG(
