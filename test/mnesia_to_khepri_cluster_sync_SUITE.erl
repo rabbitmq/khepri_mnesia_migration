@@ -27,6 +27,7 @@
          nodes_not_clustered_in_mnesia_are_removed_from_khepri_2/1,
          no_data_loss_in_the_largest_khepri_cluster/1,
          no_data_loss_in_the_khepri_cluster_having_data/1,
+         can_recreate_khepri_cluster_after_losing_one_node/1,
          mnesia_must_run/1,
          khepri_store_must_run/1,
          sort_khepri_clusters_by_members_count/1,
@@ -40,6 +41,7 @@ all() ->
      nodes_not_clustered_in_mnesia_are_removed_from_khepri_2,
      no_data_loss_in_the_largest_khepri_cluster,
      no_data_loss_in_the_khepri_cluster_having_data,
+     can_recreate_khepri_cluster_after_losing_one_node,
      mnesia_must_run,
      khepri_store_must_run,
      sort_khepri_clusters_by_members_count,
@@ -421,6 +423,100 @@ no_data_loss_in_the_khepri_cluster_having_data(Config) ->
        {ok, #{[bar] => value_to_keep,
               [baz] => value_to_keep}},
        rpc:call(Node4, khepri, get_many, [StoreId, "/*"])),
+
+    ok.
+
+can_recreate_khepri_cluster_after_losing_one_node(Config) ->
+    PropsPerNode = ?config(ra_system_props, Config),
+    Nodes = lists:sort(maps:keys(PropsPerNode)),
+    SomeNode = lists:nth(2, Nodes),
+
+    %% We assume all nodes are using the same Ra system name & store ID.
+    #{ra_system := RaSystem} = maps:get(SomeNode, PropsPerNode),
+    StoreId = RaSystem,
+
+    helpers:cluster_mnesia_nodes(Nodes),
+
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(
+                 {ok, StoreId},
+                 erpc:call(Node, khepri, start, [RaSystem, StoreId])),
+
+              ?assertEqual(Nodes, helpers:mnesia_cluster_members(Node)),
+              ?assertEqual(
+                 [Node],
+                 helpers:khepri_cluster_members(Node, StoreId))
+      end, Nodes),
+
+    ?assertEqual(
+       ok,
+       erpc:call(
+         SomeNode, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
+
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(Nodes, helpers:mnesia_cluster_members(Node)),
+              ?assertEqual(
+                 Nodes,
+                 helpers:khepri_cluster_members(Node, StoreId))
+      end, Nodes),
+
+    Path = [foo],
+    Value = bar,
+    ?assertEqual(ok, erpc:call(SomeNode, khepri, put, [StoreId, Path, Value])),
+
+    %% Add a random node to the mix.
+    {RandomNode, RandomPeer} = helpers:start_erlang_node("random-node"),
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(pong, erpc:call(RandomNode, net_adm, ping, [Node]))
+      end, Nodes),
+
+    %% Stop Khepri store on node 1 and reset it.
+    ct:pal("Stopping and \"losing\" a node"),
+    [LostNode | _] = Nodes,
+    LostNodeProps = maps:get(SomeNode, PropsPerNode),
+    erpc:call(LostNode, mnesia, stop, []),
+    erpc:call(LostNode, khepri, stop, [StoreId]),
+    LostNodeProps1 = erpc:call(
+                       LostNode, helpers, reset_ra_system, [LostNodeProps]),
+
+    ct:pal("Resetting Mnesia on lost node"),
+    MnesiaDir = erpc:call(LostNode, mnesia, system_info, [directory]),
+    ok = helpers:remove_store_dir(MnesiaDir),
+    erpc:call(LostNode, mnesia, start, []),
+
+    ct:pal("Restarting Khepri on lost node"),
+    ?assertEqual(
+       {ok, StoreId},
+       erpc:call(LostNode, khepri, start, [RaSystem, StoreId])),
+
+    ?assertEqual(
+       lists:sort([node(), RandomNode | Nodes] -- [LostNode]),
+       lists:sort(erpc:call(LostNode, erlang, nodes, []))),
+
+    ct:pal("Sync membership on lost node"),
+    ?assertEqual(
+       ok,
+       erpc:call(
+         LostNode, mnesia_to_khepri, sync_cluster_membership, [StoreId])),
+
+    ct:pal("Verifying cluster"),
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(
+                 Nodes,
+                 helpers:khepri_cluster_members(Node, StoreId))
+      end, Nodes),
+
+    ?assertEqual(
+       {ok, Value},
+       erpc:call(LostNode, khepri, get, [StoreId, Path])),
+
+    _ = erpc:call(LostNode, helpers, stop_ra_system, [LostNodeProps1]),
+
+    helpers:stop_erlang_node(RandomNode, RandomPeer),
 
     ok.
 
