@@ -117,7 +117,33 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
        [MnesiaCluster],
        #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
 
-    LargestKhepriCluster = find_largest_khepri_cluster(MnesiaCluster, StoreId),
+    NodesToConsider = case MnesiaCluster of
+                          [SingleNode] ->
+                              %% If the node is unclustered according to
+                              %% Mnesia, we consider connected nodes that run
+                              %% the Khepri store already.
+                              %%
+                              %% This allows to repair a cluster where a node
+                              %% lost its disk for instance. In ths situation,
+                              %% Mnesia thinks it's unclustered. Khepri on
+                              %% other nodes will think this lost node is
+                              %% already clustered though.
+                              %%
+                              %% See `find_largest_khepri_cluster/2' for the
+                              %% rest of the logic.
+                              PossibleNodes = list_possible_nodes(StoreId),
+                              ?LOG_DEBUG(
+                                 "Mnesia->Khepri cluster sync: "
+                                 "Connected nodes to consider: ~0p",
+                                 [PossibleNodes],
+                                 #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+                              [SingleNode | PossibleNodes];
+                          _ ->
+                              MnesiaCluster
+                      end,
+
+    LargestKhepriCluster = find_largest_khepri_cluster(
+                             NodesToConsider, StoreId),
     ?LOG_DEBUG(
        "Mnesia->Khepri cluster sync: Largest Khepri cluster: ~0p",
        [LargestKhepriCluster],
@@ -133,7 +159,7 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
     add_nodes_to_khepri_cluster(NodesToAdd, LargestKhepriCluster, StoreId),
 
     KhepriCluster = khepri_cluster_on_node(hd(LargestKhepriCluster), StoreId),
-    NodesToRemove = KhepriCluster -- MnesiaCluster,
+    NodesToRemove = KhepriCluster -- NodesToConsider,
     ?LOG_DEBUG(
        "Mnesia->Khepri cluster sync: Khepri nodes being removed from the "
        "expanded Khepri cluster: ~0p",
@@ -142,11 +168,24 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
 
     remove_nodes_from_khepri_cluster(NodesToRemove, StoreId).
 
+list_possible_nodes(StoreId) ->
+    ConnectedNodes = nodes(),
+    lists:filter(
+      fun(Node) ->
+              try
+                  erpc:call(Node, khepri_cluster, is_store_running, [StoreId])
+              catch
+                  _:_ ->
+                      false
+              end
+      end, ConnectedNodes).
+
 find_largest_khepri_cluster(Nodes, StoreId) ->
     KhepriClusters0 = list_all_khepri_clusters(Nodes, StoreId),
     KhepriClusters1 = remove_khepri_nodes_not_in_mnesia_cluster(
                         Nodes, KhepriClusters0),
-    SortedKhepriClusters = sort_khepri_clusters(KhepriClusters1, StoreId),
+    KhepriClusters2 = discard_nodes_who_lost_their_data(KhepriClusters1),
+    SortedKhepriClusters = sort_khepri_clusters(KhepriClusters2, StoreId),
     ?LOG_DEBUG(
        "Mnesia->Khepri cluster sync: Khepri clusters: ~0p",
        [SortedKhepriClusters],
@@ -199,6 +238,57 @@ remove_khepri_nodes_not_in_mnesia_cluster1(MnesiaCluster, KhepriCluster) ->
       fun(KhepriNode) ->
               lists:member(KhepriNode, MnesiaCluster)
       end, KhepriCluster).
+
+discard_nodes_who_lost_their_data(KhepriClusters) ->
+    discard_nodes_who_lost_their_data(KhepriClusters, KhepriClusters, []).
+
+discard_nodes_who_lost_their_data(
+  [[SingleNode] | Rest],
+  KhepriClusters,
+  LostNodes) ->
+    %% We check if a standalore node is also a member of another cluster. It
+    %% means the standalore node lost its state and no longer knows that it is
+    %% already clustered. Other members consider that it is already clustered
+    %% and don't know the node lost its state.
+    %%
+    %% If we find such a node, we discard it from the list of Khepri clusters
+    %% and delete if from the other clusters. This way, the rest of the logic
+    %% will consider that the lost node is unclustered.
+    IsMemberElsewhere = lists:any(
+                          fun
+                              (KhepriCluster)
+                                when length(KhepriCluster) =:= 1 ->
+                                  false;
+                              (KhepriCluster) ->
+                                  lists:member(SingleNode, KhepriCluster)
+                          end, KhepriClusters),
+    LostNodes1 = case IsMemberElsewhere of
+                     false -> LostNodes;
+                     true  -> [SingleNode | LostNodes]
+                 end,
+    discard_nodes_who_lost_their_data(Rest, KhepriClusters, LostNodes1);
+discard_nodes_who_lost_their_data(
+  [_KhepriCluster | Rest],
+  KhepriClusters,
+  LostNodes) ->
+    discard_nodes_who_lost_their_data(Rest, KhepriClusters, LostNodes);
+discard_nodes_who_lost_their_data([], KhepriClusters, []) ->
+    KhepriClusters;
+discard_nodes_who_lost_their_data([], KhepriClusters, LostNodes) ->
+    ?LOG_DEBUG(
+       "Mnesia->Khepri cluster sync: "
+       "Nodes who might have lost their data; "
+       "they will be considered unclustered: ~0p",
+       [lists:sort(LostNodes)],
+       #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+    lists:filtermap(
+      fun(KhepriCluster) ->
+              KhepriCluster1 = KhepriCluster -- LostNodes,
+              case KhepriCluster1 of
+                  [] -> false;
+                  _  -> {true, KhepriCluster1}
+              end
+      end, KhepriClusters).
 
 -define(TREE_NODES_COUNTS_KEY, kmm_tree_nodes_counts).
 -define(ERLANG_NODES_UPTIMES_KEY, kmm_erlang_node_uptimes).

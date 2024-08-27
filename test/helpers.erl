@@ -12,7 +12,10 @@
 -include_lib("common_test/include/ct.hrl").
 
 -export([init_list_of_modules_to_skip/0,
+         start_erlang_node/1,
+         stop_erlang_node/2,
          start_ra_system/1,
+         reset_ra_system/1,
          stop_ra_system/1,
          store_dir_name/1,
          remove_store_dir/1,
@@ -38,10 +41,14 @@ init_list_of_modules_to_skip() ->
     _ = application:load(khepri),
     khepri_utils:init_list_of_modules_to_skip().
 
-start_ra_system(RaSystem) ->
-    {ok, _} = application:ensure_all_started(ra),
+start_ra_system(RaSystem) when is_atom(RaSystem) ->
     StoreDir = store_dir_name(RaSystem),
+    Props = #{ra_system => RaSystem,
+              store_dir => StoreDir},
+    start_ra_system(Props);
+start_ra_system(#{ra_system := RaSystem, store_dir := StoreDir} = Props) ->
     _ = remove_store_dir(StoreDir),
+    {ok, _} = application:ensure_all_started(ra),
     Default = ra_system:default_config(),
     RaSystemConfig = Default#{name => RaSystem,
                               data_dir => StoreDir,
@@ -50,12 +57,14 @@ start_ra_system(RaSystem) ->
                               names => ra_system:derive_names(RaSystem)},
     case ra_system:start(RaSystemConfig) of
         {ok, RaSystemPid} ->
-            #{ra_system => RaSystem,
-              ra_system_pid => RaSystemPid,
-              store_dir => StoreDir};
+            Props#{ra_system_pid => RaSystemPid};
         {error, _} = Error ->
             throw(Error)
     end.
+
+reset_ra_system(Props) ->
+    stop_ra_system(Props),
+    start_ra_system(Props).
 
 stop_ra_system(#{ra_system := RaSystem,
                  store_dir := StoreDir}) ->
