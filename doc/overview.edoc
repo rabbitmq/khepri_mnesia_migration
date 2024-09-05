@@ -4,7 +4,7 @@
 @author The RabbitMQ team <rabbitmq-core@groups.vmware.com>
 @copyright 2022-2024 Broadcom. All Rights Reserved. The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 @title The Mnesia↔Khepri migration toolkit
-@version 0.5.0
+@version 0.6.0
 
 @doc
 `khepri_mnesia_migration' is a library providing helpers to migrate data
