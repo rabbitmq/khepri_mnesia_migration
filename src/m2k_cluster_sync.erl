@@ -13,6 +13,7 @@
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
+-include_lib("khepri/include/khepri.hrl").
 
 -include("src/kmm_error.hrl").
 -include("src/kmm_logging.hrl").
@@ -417,18 +418,31 @@ add_nodes_to_khepri_cluster([], _KhepriCluster, _StoreId) ->
     ok.
 
 remove_nodes_from_khepri_cluster([Node | Rest], StoreId) ->
-    Ret = rpc:call(
-            Node,
-            khepri_cluster, reset, [StoreId]),
-    case Ret of
-        ok ->
-            remove_nodes_from_khepri_cluster(Rest, StoreId);
-        Error ->
-            throw(
-              ?kmm_error(
-                 failed_to_reset_khepri_node,
-                 #{node => Node,
-                   error => Error}))
+    try
+        case erpc:call(Node, khepri_cluster, reset, [StoreId]) of
+            ok ->
+                remove_nodes_from_khepri_cluster(Rest, StoreId);
+            {error, ?khepri_error(not_a_khepri_store, _)} ->
+                ?LOG_DEBUG(
+                   "Mnesia->Khepri cluster sync: Node ~0p does not run the "
+                   "Khepri store, skipping its removal from the Khepri "
+                   "cluster",
+                   [Node],
+                   #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN});
+            Error ->
+                throw(
+                  ?kmm_error(
+                     failed_to_reset_khepri_node,
+                     #{node => Node,
+                       error => Error}))
+        end
+    catch
+        error:{erpc, noconnection} ->
+            ?LOG_DEBUG(
+               "Mnesia->Khepri cluster sync: Node ~0p unreachable, "
+               "skipping its removal from the Khepri cluster",
+               [Node],
+               #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN})
     end;
 remove_nodes_from_khepri_cluster([], _StoreId) ->
     ok.

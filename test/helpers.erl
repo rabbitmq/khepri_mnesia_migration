@@ -252,7 +252,12 @@ start_erlang_node(Name) ->
     {Node, Peer}.
 
 stop_erlang_node(_Node, Peer) ->
-    ok = peer:stop(Peer).
+    try
+        ok = peer:stop(Peer)
+    catch
+        _:noproc ->
+            ok
+    end.
 -else.
 start_erlang_node(Name) ->
     Name1 = list_to_atom(Name),
