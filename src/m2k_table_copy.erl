@@ -124,17 +124,38 @@ is_migration_finished1(StoreId, MigrationId) ->
     end.
 
 setup_projection(StoreId, ProjectionName) ->
-    ?LOG_DEBUG(
-       "Mnesia->Khepri data copy: setup Khepri projection (name: \"~s\")",
-       [ProjectionName],
-       #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
-    PathPattern = marker_path(?KHEPRI_WILDCARD_STAR),
-    Options = #{type => set, read_concurrency => true},
-    ProjectionFun = fun(Path, Progress) ->
-                            {lists:last(Path), Progress}
-                    end,
-    Projection = khepri_projection:new(ProjectionName, ProjectionFun, Options),
-    khepri:register_projection(StoreId, PathPattern, Projection).
+    %% In case this function is called many times concurrently, for instance
+    %% because many processes use `mnesia_to_khepri:handle_fallback()' at the
+    %% same time, we use a lock and check if the ETS table already exists
+    %% inside the lock before registering the projection.
+    %%
+    %% This avoids that all these processes register the same projection many
+    %% times, causing many Khepri/Ra commands to be sent to the leader.
+    Lock = {{?MODULE, StoreId}, self()},
+    global:set_lock(Lock, [node()]),
+    try
+        ProjectionName = ?PROJECTION_NAME,
+        case ets:whereis(ProjectionName) of
+            undefined ->
+                ?LOG_DEBUG(
+                   "Mnesia->Khepri data copy: setup Khepri projection "
+                   "(name: \"~s\")",
+                   [ProjectionName],
+                   #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+                PathPattern = marker_path(?KHEPRI_WILDCARD_STAR),
+                Options = #{type => set, read_concurrency => true},
+                ProjectionFun = fun(Path, Progress) ->
+                                        {lists:last(Path), Progress}
+                                end,
+                Projection = khepri_projection:new(
+                               ProjectionName, ProjectionFun, Options),
+                khepri:register_projection(StoreId, PathPattern, Projection);
+            _ ->
+                ok
+        end
+    after
+        global:del_lock(Lock, [node()])
+    end.
 
 is_migration_finished_slow(StoreId, MigrationId) ->
     Path = marker_path(MigrationId),
