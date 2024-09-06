@@ -199,7 +199,9 @@ do_cleanup(Tables) ->
                  [Table],
                  #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
               case mnesia:change_table_access_mode(Table, read_write) of
-                  {atomic, ok} ->
+                  Ret when Ret =:= {atomic, ok} orelse
+                           Ret =:= {aborted,
+                                    {already_exists, Table, read_write}} ->
                       ?LOG_DEBUG(
                          "Mnesia->Khepri data copy: deleting Mnesia table "
                          "`~ts`",
@@ -207,6 +209,13 @@ do_cleanup(Tables) ->
                          #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
                       case mnesia:delete_table(Table) of
                           {atomic, ok} ->
+                              ok;
+                          {aborted, {no_exists, _}} ->
+                              ?LOG_DEBUG(
+                                 "Mnesia->Khepri data copy: Mnesia table "
+                                 "`~ts` already deleted",
+                                 [Table],
+                                 #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
                               ok;
                           {aborted, Reason2} ->
                               ?LOG_DEBUG(
@@ -216,6 +225,13 @@ do_cleanup(Tables) ->
                                  #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
                               ok
                       end;
+                  {aborted, {no_exists, _}} ->
+                      ?LOG_DEBUG(
+                         "Mnesia->Khepri data copy: Mnesia table `~ts` "
+                         "already deleted",
+                         [Table],
+                         #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
+                      ok;
                   {aborted, Reason1} ->
                       ?LOG_DEBUG(
                          "Mnesia->Khepri data copy: failed to mark Mnesia "
