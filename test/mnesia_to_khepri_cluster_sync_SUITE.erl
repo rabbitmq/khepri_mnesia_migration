@@ -480,7 +480,7 @@ can_recreate_khepri_cluster_after_losing_one_node(Config) ->
     %% Stop Khepri store on node 1 and reset it.
     ct:pal("Stopping and \"losing\" a node"),
     [LostNode | _] = Nodes,
-    LostNodeProps = maps:get(SomeNode, PropsPerNode),
+    LostNodeProps = maps:get(LostNode, PropsPerNode),
     erpc:call(LostNode, mnesia, stop, []),
     erpc:call(LostNode, khepri, stop, [StoreId]),
     LostNodeProps1 = erpc:call(
