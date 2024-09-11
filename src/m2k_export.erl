@@ -76,7 +76,8 @@ write(
              after
                  15_000 ->
                      ?LOG_ERROR(
-                        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] timeout: record/~0p",
+                        "Mnesia->Khepri data copy: [" ?MODULE_STRING "] "
+                        "timeout: record/~0p",
                         [Record],
                         #{domain => ?KMM_M2K_TABLE_COPY_LOG_DOMAIN}),
                      {error, timeout}
