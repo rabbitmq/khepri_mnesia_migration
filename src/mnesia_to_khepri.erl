@@ -55,6 +55,7 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+-include("src/kmm_error.hrl").
 -include("src/kmm_logging.hrl").
 
 -export([sync_cluster_membership/0, sync_cluster_membership/1,
