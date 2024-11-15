@@ -122,7 +122,8 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
                           [SingleNode] ->
                               %% If the node is unclustered according to
                               %% Mnesia, we consider connected nodes that run
-                              %% the Khepri store already.
+                              %% the Khepri store already and have this node
+                              %% among the cluster members they know about.
                               %%
                               %% This allows to repair a cluster where a node
                               %% lost its disk for instance. In ths situation,
@@ -170,11 +171,28 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
     remove_nodes_from_khepri_cluster(NodesToRemove, StoreId).
 
 list_possible_nodes(StoreId) ->
+    %% To detect if this node needs to be added back to an existing cluster, we
+    %% check all connected Erlang nodes against the following conditions:
+    %%   1. A Khepri store named `StoreId' must be running
+    %%   2. That Khepri store must think that this node is part of the cluster
     ConnectedNodes = nodes(),
+    ThisMember = khepri_cluster:this_member(StoreId),
     lists:filter(
       fun(Node) ->
               try
-                  erpc:call(Node, khepri_cluster, is_store_running, [StoreId])
+                  IsKhepriRunning = erpc:call(
+                                      Node, khepri_cluster, is_store_running,
+                                      [StoreId]),
+                  case IsKhepriRunning of
+                      true ->
+                          Members = erpc:call(
+                                      Node,
+                                      khepri_cluster, locally_known_members,
+                                      [StoreId]),
+                          lists:member(ThisMember, Members);
+                      false ->
+                          false
+                  end
               catch
                   _:_ ->
                       false
