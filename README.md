@@ -1,7 +1,7 @@
 # `khepri_mnesia_migration`: Mnesia⬌Khepri migration toolkit
 
 [![Hex.pm](https://img.shields.io/hexpm/v/khepri_mnesia_migration)](https://hex.pm/packages/khepri_mnesia_migration/)
-[![Test](https://github.com/rabbitmq/khepri_mnesia_migration/actions/workflows/test.yaml/badge.svg)](https://github.com/rabbitmq/khepri_mnesia_migration/actions/workflows/test.yaml)
+[![Test](https://github.com/rabbitmq/khepri_mnesia_migration/actions/workflows/test-and-release.yaml/badge.svg)](https://github.com/rabbitmq/khepri_mnesia_migration/actions/workflows/test-and-release.yaml)
 [![Codecov](https://codecov.io/gh/rabbitmq/khepri_mnesia_migration/branch/main/graph/badge.svg?token=R0OGKZ2RK2)](https://codecov.io/gh/rabbitmq/khepri_mnesia_migration)
 
 `khepri_mnesia_migration` is a library providing helpers to migrate data
