@@ -185,11 +185,12 @@ list_possible_nodes(StoreId) ->
                                       [StoreId]),
                   case IsKhepriRunning of
                       true ->
-                          Members = erpc:call(
-                                      Node,
-                                      khepri_cluster, locally_known_members,
-                                      [StoreId]),
-                          lists:member(ThisMember, Members);
+                          case locally_known_members(Node, StoreId) of
+                              {ok, Members} ->
+                                  lists:member(ThisMember, Members);
+                              _ ->
+                                  false
+                          end;
                       false ->
                           false
                   end
@@ -198,6 +199,21 @@ list_possible_nodes(StoreId) ->
                       false
               end
       end, ConnectedNodes).
+
+locally_known_members(Node, StoreId) ->
+    %% Khepri 0.17+ replaces `khepri_cluster:locally_known_members/1' (Khepri
+    %% 0.16 and lower) with `khepri_cluster:members/2' and the `favor' option
+    %% set to `low_latency'. Prior to 0.17, `khepri_cluster:members/2' did not
+    %% exist (only `khepri_cluster:members/1') so we can use `undef' to detect
+    %% when the remote member is running 0.16 or lower.
+    try
+        erpc:call(
+          Node, khepri_cluster, members, [StoreId, #{favor => low_latency}])
+    catch
+        error:{exception, undef, [{khepri_cluster, members, _, _} | _]} ->
+            erpc:call(
+              Node, khepri_cluster, locally_known_members, [StoreId])
+    end.
 
 find_largest_khepri_cluster(Nodes, StoreId) ->
     KhepriClusters0 = list_all_khepri_clusters(Nodes, StoreId),
