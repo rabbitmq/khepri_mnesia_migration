@@ -9,10 +9,13 @@
 %% @private
 
 -module(khepri_mnesia_migration_app).
-
 -behaviour(application).
 
+-include_lib("stdlib/include/assert.hrl").
+
 -export([start/2, stop/1]).
+-export([enable_repair_cluster_mechanism/1,
+         should_repair_cluster/0]).
 
 start(_StartType, _StartArgs) ->
     khepri_mnesia_migration_sup:start_link().
@@ -20,4 +23,14 @@ start(_StartType, _StartArgs) ->
 stop(_State) ->
     ok.
 
-%% internal functions
+enable_repair_cluster_mechanism(Enabled) when is_boolean(Enabled) ->
+    application:set_env(
+      khepri_mnesia_migration, should_repair_cluster, Enabled,
+      [{persistent, true}]).
+
+should_repair_cluster() ->
+    ShouldRepairCluster = application:get_env(
+                            khepri_mnesia_migration, should_repair_cluster,
+                            true),
+    ?assertMatch(Value when is_boolean(Value), ShouldRepairCluster),
+    ShouldRepairCluster.

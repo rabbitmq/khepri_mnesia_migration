@@ -119,8 +119,9 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
        [MnesiaCluster],
        #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
 
+    ShouldRepairCluster = khepri_mnesia_migration_app:should_repair_cluster(),
     NodesToConsider = case MnesiaCluster of
-                          [SingleNode] ->
+                          [SingleNode] when ShouldRepairCluster ->
                               %% If the node is unclustered according to
                               %% Mnesia, we consider connected nodes that run
                               %% the Khepri store already and have this node
@@ -132,14 +133,20 @@ do_sync_cluster_locked(#?MODULE{khepri_store = StoreId}) ->
                               %% other nodes will think this lost node is
                               %% already clustered though.
                               %%
+                              %% This behavior can be disabled by setting the
+                              %% `should_repair_cluster' application
+                              %% environment variable to false.
+                              %%
                               %% See `find_largest_khepri_cluster/2' for the
                               %% rest of the logic.
                               PossibleNodes = list_possible_nodes(StoreId),
                               ?LOG_DEBUG(
                                  "Mnesia->Khepri cluster sync: "
-                                 "Connected nodes to consider: ~0p",
+                                 "Connected nodes to consider for cluster "
+                                 "repair: ~0p",
                                  [PossibleNodes],
-                                 #{domain => ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
+                                 #{domain =>
+                                   ?KMM_M2K_CLUSTER_SYNC_LOG_DOMAIN}),
                               [SingleNode | PossibleNodes];
                           _ ->
                               MnesiaCluster
@@ -196,7 +203,7 @@ list_possible_nodes(StoreId) ->
                           false
                   end
               catch
-                  _:_ ->
+                  _C:_R:_S ->
                       false
               end
       end, ConnectedNodes).
