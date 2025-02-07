@@ -211,7 +211,7 @@ locally_known_members(Node, StoreId) ->
         erpc:call(
           Node, khepri_cluster, members, [StoreId, #{favor => low_latency}])
     catch
-        error:{exception, undef, [{khepri_cluster, members, _, _} | _]} ->
+        error:{exception, function_clause, _} ->
             erpc:call(
               Node, khepri_cluster, locally_known_members, [StoreId])
     end.

@@ -44,13 +44,15 @@ all() ->
      nodes_not_clustered_in_mnesia_are_removed_from_khepri_2,
      no_data_loss_in_the_largest_khepri_cluster,
      no_data_loss_in_the_khepri_cluster_having_data,
-     % FIXME: Turn off lost node testing for now. There is still an issue
-     % where, on restart, the lost node receives an unexpected `append_entry'
-     % RPC from the cluster and dies with
-     % `leader_saw_append_entries_rpc_in_same_term'.
-     %can_recreate_khepri_cluster_after_losing_one_node,
-     %can_recreate_khepri_cluster_after_losing_many_nodes_1,
-     %can_recreate_khepri_cluster_after_losing_many_nodes_2,
+
+     %% FIXME: There is still an issue triggered by the following tests where,
+     %% on restart, the lost node receives an unexpected `append_entry' RPC
+     %% from the cluster and dies with
+     %% `leader_saw_append_entries_rpc_in_same_term'.
+     can_recreate_khepri_cluster_after_losing_one_node,
+     can_recreate_khepri_cluster_after_losing_many_nodes_1,
+     can_recreate_khepri_cluster_after_losing_many_nodes_2,
+
      mnesia_must_run,
      khepri_store_must_run,
      sort_khepri_clusters_by_members_count,
@@ -496,6 +498,10 @@ can_recreate_khepri_cluster_after_losing_one_node(Config) ->
     ok = helpers:remove_store_dir(MnesiaDir),
     erpc:call(LostNode, mnesia, start, []),
 
+    ct:pal("Wait for leader on remaining nodes"),
+    ok = erpc:call(
+           SomeNode, khepri_cluster, wait_for_leader, [StoreId, infinity]),
+
     ct:pal("Restarting Khepri on lost node"),
     ?assertEqual(
        {ok, StoreId},
@@ -598,6 +604,10 @@ can_recreate_khepri_cluster_after_losing_many_nodes_1(Config) ->
     ok = helpers:remove_store_dir(MnesiaDir2),
     erpc:call(LostNode2, mnesia, start, []),
 
+    ct:pal("Wait for leader on remaining nodes"),
+    ok = erpc:call(
+           SomeNode, khepri_cluster, wait_for_leader, [StoreId, infinity]),
+
     ct:pal("Restarting Khepri on lost node 1"),
     ?assertEqual(
        {ok, StoreId},
@@ -697,6 +707,10 @@ can_recreate_khepri_cluster_after_losing_many_nodes_2(Config) ->
     NodePeers = ?config(peer_nodes, Config),
     LostNode2Peer = proplists:get_value(LostNode2, NodePeers),
     helpers:stop_erlang_node(LostNode2, LostNode2Peer),
+
+    ct:pal("Wait for leader on remaining nodes"),
+    ok = erpc:call(
+           SomeNode, khepri_cluster, wait_for_leader, [StoreId, infinity]),
 
     ct:pal("Restarting Khepri on lost node 1"),
     ?assertEqual(
