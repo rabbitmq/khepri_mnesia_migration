@@ -202,11 +202,14 @@ list_possible_nodes(StoreId) ->
       end, ConnectedNodes).
 
 locally_known_members(Node, StoreId) ->
-    %% Khepri 0.17+ replaces `khepri_cluster:locally_known_members/1' (Khepri
-    %% 0.16 and lower) with `khepri_cluster:members/2' and the `favor' option
-    %% set to `low_latency'. Prior to 0.17, `khepri_cluster:members/2' did not
-    %% exist (only `khepri_cluster:members/1') so we can use `undef' to detect
-    %% when the remote member is running 0.16 or lower.
+    %% Khepri 0.17.0 replaces `khepri_cluster:locally_known_members/1' (Khepri
+    %% 0.16.0 and lower) with `khepri_cluster:members/2' and the `favor'
+    %% option set to `low_latency'.
+    %%
+    %% Prior to 0.17.0, `khepri_cluster:members/2' did exist but took
+    %% different arguments. Thus exist (only `khepri_cluster:members/1') so we
+    %% can use a `function_clause' exception to detect when the remote member
+    %% is running Khepri 0.16.0 or lower.
     try
         erpc:call(
           Node, khepri_cluster, members, [StoreId, #{favor => low_latency}])
