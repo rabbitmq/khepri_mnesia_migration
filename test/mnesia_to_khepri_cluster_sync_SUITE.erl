@@ -34,6 +34,7 @@
          mnesia_must_run/1,
          khepri_store_must_run/1,
          sort_khepri_clusters_by_members_count/1,
+         sort_khepri_clusters_by_machine_version/1,
          sort_khepri_clusters_by_tree_nodes_count/1,
          sort_khepri_clusters_by_erlang_node_uptime/1,
          sort_khepri_clusters_by_erlang_node_name/1]).
@@ -56,6 +57,7 @@ all() ->
      mnesia_must_run,
      khepri_store_must_run,
      sort_khepri_clusters_by_members_count,
+     sort_khepri_clusters_by_machine_version,
      sort_khepri_clusters_by_tree_nodes_count,
      sort_khepri_clusters_by_erlang_node_uptime,
      sort_khepri_clusters_by_erlang_node_name].
@@ -860,6 +862,68 @@ sort_khepri_clusters_by_members_count(Config) ->
     ?assertEqual(
        SortedKhepriClusters,
        m2k_cluster_sync:sort_khepri_clusters(KhepriClusters, StoreId)),
+
+    ok.
+
+sort_khepri_clusters_by_machine_version(Config) ->
+    PropsPerNode = ?config(ra_system_props, Config),
+    Nodes = lists:sort(maps:keys(PropsPerNode)),
+    [Node1, Node2, Node3, Node4, Node5] = Nodes,
+    SomeNode = Node5,
+
+    %% We assume all nodes are using the same Ra system name & store ID.
+    #{ra_system := RaSystem} = maps:get(SomeNode, PropsPerNode),
+    StoreId = RaSystem,
+
+    lists:foreach(
+      fun(Node) ->
+              ?assertEqual(
+                 {ok, StoreId},
+                 rpc:call(Node, khepri, start, [RaSystem, StoreId]))
+      end, Nodes),
+
+    ?assertEqual(
+       ok,
+       erpc:call(
+         Node3, meck, new,
+         [khepri_machine, [no_link, unstick, passthrough]])),
+    ?assertEqual(
+       ok,
+       erpc:call(
+         Node3, meck, expect,
+         [khepri_machine, version, [{[], {meck_value, 0}}]])),
+
+    ?assertEqual(
+       ok,
+       erpc:call(
+         Node4, meck, new,
+         [khepri_machine, [no_link, unstick, passthrough]])),
+    ?assertEqual(
+       ok,
+       erpc:call(
+         Node4, meck, expect,
+         [khepri_machine, version, [{[], {meck_value, 999999}}]])),
+
+    KhepriClusters = randomize_list([[Node1],
+                                     [Node2],
+                                     [Node3],
+                                     [Node4],
+                                     [Node5]]),
+    SortedKhepriClusters = [[Node3],
+                            [Node1],
+                            [Node2],
+                            [Node5],
+                            [Node4]],
+    ?assertEqual(
+       SortedKhepriClusters,
+       m2k_cluster_sync:sort_khepri_clusters(KhepriClusters, StoreId)),
+
+    ?assertEqual(
+       ok,
+       erpc:call(Node3, meck, unload, [khepri_machine])),
+    ?assertEqual(
+       ok,
+       erpc:call(Node4, meck, unload, [khepri_machine])),
 
     ok.
 

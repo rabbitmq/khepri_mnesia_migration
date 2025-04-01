@@ -329,19 +329,23 @@ discard_nodes_who_lost_their_data([], KhepriClusters, LostNodes) ->
               end
       end, KhepriClusters).
 
+-define(KHEPRI_MACHINE_VERSIONS_KEY, kmm_khepri_machine_versions).
 -define(TREE_NODES_COUNTS_KEY, kmm_tree_nodes_counts).
 -define(ERLANG_NODES_UPTIMES_KEY, kmm_erlang_node_uptimes).
 
 sort_khepri_clusters(KhepriClusters, StoreId) ->
+    _ = erlang:put(?KHEPRI_MACHINE_VERSIONS_KEY, #{}),
     _ = erlang:put(?TREE_NODES_COUNTS_KEY, #{}),
     _ = erlang:put(?ERLANG_NODES_UPTIMES_KEY, #{}),
     SortedNodes = do_sort_khepri_clusters(KhepriClusters, StoreId),
     _ = erlang:erase(?ERLANG_NODES_UPTIMES_KEY),
     _ = erlang:erase(?TREE_NODES_COUNTS_KEY),
+    _ = erlang:erase(?KHEPRI_MACHINE_VERSIONS_KEY),
     SortedNodes.
 
 do_sort_khepri_clusters(KhepriClusters, StoreId) ->
     Criterias = [fun compare_members_counts/3,
+                 fun compare_khepri_machine_versions/3,
                  fun compare_tree_nodes_counts/3,
                  fun compare_erlang_node_uptimes/3,
                  fun compare_erlang_node_names/3],
@@ -365,6 +369,14 @@ compare_members_counts(A, B, _StoreId) ->
         true                            -> length(A) > length(B)
     end.
 
+compare_khepri_machine_versions(A, B, _StoreId) ->
+    AMacVer = get_khepri_machine_versions(A),
+    BMacVer = get_khepri_machine_versions(B),
+    if
+        AMacVer =:= BMacVer -> undefined;
+        true                -> AMacVer < BMacVer
+    end.
+
 compare_tree_nodes_counts(A, B, StoreId) ->
     ANodesCount = get_tree_nodes_count(A, StoreId),
     BNodesCount = get_tree_nodes_count(B, StoreId),
@@ -383,6 +395,29 @@ compare_erlang_node_uptimes(A, B, _StoreId) ->
 
 compare_erlang_node_names(A, B, _StoreId) ->
     A =< B.
+
+get_khepri_machine_versions(Nodes) ->
+    KhepriMacVers = erlang:get(?KHEPRI_MACHINE_VERSIONS_KEY),
+    case KhepriMacVers of
+        #{Nodes := KhepriMacVer} ->
+            KhepriMacVer;
+        _ ->
+            Rets = erpc:multicall(Nodes, khepri_machine, version, []),
+            MacVers = lists:map(
+                        fun
+                            ({ok, MacVer}) ->
+                                MacVer;
+                            (_Error) ->
+                                ?kmm_misuse(
+                                   failed_to_query_khepri_machine_versions,
+                                   #{nodes => Nodes,
+                                     returns => Rets})
+                        end, Rets),
+            MacVer = lists:min(MacVers),
+            KhepriMacVers1 = KhepriMacVers#{Nodes => MacVer},
+            _ = erlang:put(?KHEPRI_MACHINE_VERSIONS_KEY, KhepriMacVers1),
+            MacVer
+    end.
 
 get_tree_nodes_count(Nodes, StoreId) ->
     TreeNodesCounts = erlang:get(?TREE_NODES_COUNTS_KEY),
