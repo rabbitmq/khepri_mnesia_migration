@@ -335,14 +335,14 @@ discard_nodes_who_lost_their_data([], KhepriClusters, LostNodes) ->
 sort_khepri_clusters(KhepriClusters, StoreId) ->
     _ = erlang:put(?TREE_NODES_COUNTS_KEY, #{}),
     _ = erlang:put(?ERLANG_NODES_UPTIMES_KEY, #{}),
-    SortedNodes = do_sort_khepri_clusters_by_size(KhepriClusters, StoreId),
+    SortedNodes = do_sort_khepri_clusters(KhepriClusters, StoreId),
     _ = erlang:erase(?ERLANG_NODES_UPTIMES_KEY),
     _ = erlang:erase(?TREE_NODES_COUNTS_KEY),
     SortedNodes.
 
-do_sort_khepri_clusters_by_size(KhepriClusters, StoreId) ->
-    Criterias = [fun compare_members_count/3,
-                 fun compare_tree_nodes_count/3,
+do_sort_khepri_clusters(KhepriClusters, StoreId) ->
+    Criterias = [fun compare_members_counts/3,
+                 fun compare_tree_nodes_counts/3,
                  fun compare_erlang_node_uptimes/3,
                  fun compare_erlang_node_names/3],
     lists:sort(
@@ -357,7 +357,7 @@ do_sort_khepri_clusters_by_size(KhepriClusters, StoreId) ->
       end,
       KhepriClusters).
 
-compare_members_count(A, B, _StoreId) ->
+compare_members_counts(A, B, _StoreId) ->
     AMembersCount = length(A),
     BMembersCount = length(B),
     if
@@ -365,7 +365,7 @@ compare_members_count(A, B, _StoreId) ->
         true                            -> length(A) > length(B)
     end.
 
-compare_tree_nodes_count(A, B, StoreId) ->
+compare_tree_nodes_counts(A, B, StoreId) ->
     ANodesCount = get_tree_nodes_count(A, StoreId),
     BNodesCount = get_tree_nodes_count(B, StoreId),
     if
@@ -418,12 +418,12 @@ get_longest_erlang_node_uptime(Nodes) ->
             Uptimes = lists:map(
                         fun
                             ({ok, Uptime}) ->
-                        Uptime;
-                    (_Error) ->
-                        ?kmm_misuse(
-                           failed_to_query_erlang_node_uptimes,
-                           #{nodes => Nodes,
-                             returns => Rets})
+                                Uptime;
+                            (_Error) ->
+                                ?kmm_misuse(
+                                   failed_to_query_erlang_node_uptimes,
+                                   #{nodes => Nodes,
+                                     returns => Rets})
                         end, Rets),
             Uptime = lists:max(Uptimes),
             NodeUptimes1 = NodeUptimes#{Nodes => Uptime},
