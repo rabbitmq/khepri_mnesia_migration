@@ -15,6 +15,7 @@
 -include("src/kmm_error.hrl").
 
 -export([all/0,
+         suite/0,
          groups/0,
          init_per_suite/1,
          end_per_suite/1,
@@ -61,6 +62,9 @@ all() ->
      sort_khepri_clusters_by_tree_nodes_count,
      sort_khepri_clusters_by_erlang_node_uptime,
      sort_khepri_clusters_by_erlang_node_name].
+
+suite() ->
+    [{timetrap, {minutes, 5}}].
 
 groups() ->
     [].
